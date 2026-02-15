@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Finance Analysis</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #0f1117; --surface: #1a1d2e; --surface2: #252840;
+    --border: #2e3250; --accent: #6366f1; --accent2: #818cf8;
+    --green: #22c55e; --red: #ef4444; --yellow: #eab308;
+    --text: #e2e8f0; --text2: #94a3b8; --text3: #64748b;
+    --radius: 8px; --shadow: 0 4px 24px #0006;
+  }
+  body { background: var(--bg); color: var(--text); font-family: system-ui, sans-serif;
+         font-size: 14px; line-height: 1.5; min-height: 100vh; }
+  a { color: var(--accent2); text-decoration: none; }
+
+  /* Layout */
+  header { background: var(--surface); border-bottom: 1px solid var(--border);
+           padding: 0 24px; display: flex; align-items: center; gap: 24px; height: 56px; }
+  header h1 { font-size: 18px; font-weight: 700; color: var(--accent2); white-space: nowrap; }
+  nav { display: flex; gap: 4px; }
+  nav button { background: none; border: none; color: var(--text2); padding: 6px 14px;
+               border-radius: var(--radius); cursor: pointer; font-size: 14px; font-weight: 500;
+               transition: all .15s; }
+  nav button:hover { background: var(--surface2); color: var(--text); }
+  nav button.active { background: var(--accent); color: #fff; }
+  main { max-width: 1100px; margin: 0 auto; padding: 24px; }
+
+  /* Cards */
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+          padding: 20px; }
+  .card-title { font-size: 13px; font-weight: 600; color: var(--text3);
+                text-transform: uppercase; letter-spacing: .06em; margin-bottom: 8px; }
+  .card-value { font-size: 28px; font-weight: 700; }
+  .card-value.green { color: var(--green); }
+  .card-value.red { color: var(--red); }
+  .card-value.yellow { color: var(--yellow); }
+
+  /* Dashboard grid */
+  .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; }
+  .month-nav { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
+  .month-nav select { background: var(--surface2); border: 1px solid var(--border); color: var(--text);
+                      padding: 6px 10px; border-radius: var(--radius); font-size: 14px; }
+  .month-nav button { background: var(--surface2); border: 1px solid var(--border); color: var(--text);
+                      padding: 6px 12px; border-radius: var(--radius); cursor: pointer; font-size: 18px; }
+  .month-nav button:hover { background: var(--border); }
+  .month-label { font-size: 18px; font-weight: 700; min-width: 160px; text-align: center; }
+
+  /* Table */
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; }
+  th { background: var(--surface2); color: var(--text3); font-size: 12px;
+       text-transform: uppercase; letter-spacing: .06em; padding: 10px 12px;
+       text-align: left; border-bottom: 1px solid var(--border); }
+  td { padding: 10px 12px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: var(--surface2); }
+  .amount-income { color: var(--green); font-weight: 600; }
+  .amount-expense { color: var(--red); font-weight: 600; }
+
+  /* Badge */
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 99px;
+           font-size: 11px; font-weight: 600; }
+  .badge-A { background: #4f46e530; color: #818cf8; }
+  .badge-B { background: #06b6d430; color: #22d3ee; }
+  .badge-C { background: #8b5cf630; color: #c4b5fd; }
+  .badge-D { background: #22c55e30; color: #86efac; }
+  .badge-E { background: #eab30830; color: #fde047; }
+  .badge-F { background: #ef444430; color: #fca5a5; }
+  .badge-monthly { background: #0ea5e930; color: #38bdf8; }
+  .badge-yearly  { background: #a855f730; color: #d8b4fe; }
+
+  /* Buttons */
+  .btn { padding: 7px 14px; border-radius: var(--radius); border: none;
+         cursor: pointer; font-size: 13px; font-weight: 600; transition: all .15s; }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-primary:hover { background: var(--accent2); }
+  .btn-danger  { background: #ef444420; color: var(--red); border: 1px solid #ef444440; }
+  .btn-danger:hover  { background: #ef444440; }
+  .btn-sm { padding: 4px 10px; font-size: 12px; }
+  .btn-ghost { background: var(--surface2); color: var(--text2); border: 1px solid var(--border); }
+  .btn-ghost:hover { background: var(--border); color: var(--text); }
+
+  /* Section header */
+  .section-header { display: flex; justify-content: space-between; align-items: center;
+                    margin-bottom: 16px; }
+  .section-header h2 { font-size: 18px; font-weight: 700; }
+
+  /* Modal */
+  .modal-bg { position: fixed; inset: 0; background: #0009; display: flex;
+              align-items: center; justify-content: center; z-index: 100; }
+  .modal { background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+           padding: 28px; width: 480px; max-width: 95vw; max-height: 90vh; overflow-y: auto;
+           box-shadow: var(--shadow); }
+  .modal h3 { font-size: 17px; font-weight: 700; margin-bottom: 20px; }
+  .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 24px; }
+
+  /* Form */
+  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .form-grid .full { grid-column: 1 / -1; }
+  label { display: block; margin-bottom: 4px; font-size: 12px; font-weight: 600;
+          color: var(--text3); text-transform: uppercase; letter-spacing: .05em; }
+  input, select, textarea {
+    width: 100%; background: var(--surface2); border: 1px solid var(--border);
+    color: var(--text); padding: 8px 10px; border-radius: var(--radius); font-size: 14px;
+    outline: none; transition: border .15s;
+  }
+  input:focus, select:focus, textarea:focus { border-color: var(--accent); }
+  input[type="radio"] { width: auto; }
+  .radio-group { display: flex; gap: 16px; align-items: center; padding: 8px 0; }
+  .radio-group label { margin: 0; text-transform: none; font-size: 14px;
+                       font-weight: 400; color: var(--text); letter-spacing: 0; cursor: pointer; }
+  .radio-group input { width: auto; margin-right: 6px; }
+
+  /* Toast */
+  #toast { position: fixed; bottom: 24px; right: 24px; background: var(--surface2);
+           border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 18px;
+           font-size: 14px; box-shadow: var(--shadow); opacity: 0;
+           transition: opacity .3s; pointer-events: none; z-index: 200; }
+  #toast.show { opacity: 1; }
+  #toast.success { border-color: var(--green); color: var(--green); }
+  #toast.error   { border-color: var(--red);   color: var(--red); }
+
+  /* Page sections */
+  .page { display: none; }
+  .page.active { display: block; }
+
+  .empty { color: var(--text3); text-align: center; padding: 40px; font-size: 15px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Finance Analysis</h1>
+  <nav>
+    <button class="active" onclick="showPage('dashboard')">Dashboard</button>
+    <button onclick="showPage('singular')">One-time</button>
+    <button onclick="showPage('regular')">Recurring</button>
+  </nav>
+</header>
+
+<main>
+  <!-- ── Dashboard ── -->
+  <section id="page-dashboard" class="page active">
+    <div class="month-nav">
+      <button onclick="prevMonth()">&#8249;</button>
+      <span class="month-label" id="month-label">Loading…</span>
+      <button onclick="nextMonth()">&#8250;</button>
+    </div>
+    <div class="summary-grid" id="summary-grid">
+      <div class="card"><div class="card-title">Total Income</div>
+        <div class="card-value green" id="s-total-income">—</div></div>
+      <div class="card"><div class="card-title">Total Expenses</div>
+        <div class="card-value red" id="s-total-expenses">—</div></div>
+      <div class="card"><div class="card-title">Net Balance</div>
+        <div class="card-value" id="s-net">—</div></div>
+      <div class="card"><div class="card-title">One-time Income</div>
+        <div class="card-value green" id="s-singular-income">—</div></div>
+      <div class="card"><div class="card-title">One-time Expenses</div>
+        <div class="card-value red" id="s-singular-expenses">—</div></div>
+      <div class="card"><div class="card-title">Recurring Income</div>
+        <div class="card-value green" id="s-regular-income">—</div></div>
+      <div class="card"><div class="card-title">Recurring Expenses</div>
+        <div class="card-value red" id="s-regular-expenses">—</div></div>
+    </div>
+  </section>
+
+  <!-- ── One-time entries ── -->
+  <section id="page-singular" class="page">
+    <div class="section-header">
+      <h2>One-time Entries</h2>
+      <button class="btn btn-primary" onclick="openSingularModal()">+ Add Entry</button>
+    </div>
+    <div class="card table-wrap">
+      <table id="singular-table">
+        <thead>
+          <tr>
+            <th>Date</th><th>Description</th><th>Amount</th>
+            <th>Type</th><th>Necessity</th><th></th>
+          </tr>
+        </thead>
+        <tbody id="singular-tbody"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ── Recurring entries ── -->
+  <section id="page-regular" class="page">
+    <div class="section-header">
+      <h2>Recurring Entries</h2>
+      <button class="btn btn-primary" onclick="openRegularModal()">+ Add Entry</button>
+    </div>
+    <div class="card table-wrap">
+      <table id="regular-table">
+        <thead>
+          <tr>
+            <th>Description</th><th>Amount / month</th><th>Period</th>
+            <th>From</th><th>To</th><th>Type</th><th>Necessity</th><th></th>
+          </tr>
+        </thead>
+        <tbody id="regular-tbody"></tbody>
+      </table>
+    </div>
+  </section>
+</main>
+
+<!-- ── One-time modal ── -->
+<div id="singular-modal" class="modal-bg" style="display:none">
+  <div class="modal">
+    <h3 id="singular-modal-title">Add One-time Entry</h3>
+    <form id="singular-form" onsubmit="submitSingular(event)">
+      <input type="hidden" id="s-id">
+      <div class="form-grid">
+        <div class="full">
+          <div class="radio-group">
+            <input type="radio" name="s_kind" id="s-income" value="income" checked>
+            <label for="s-income">Income</label>
+            <input type="radio" name="s_kind" id="s-expense" value="expense">
+            <label for="s-expense">Expense</label>
+          </div>
+        </div>
+        <div>
+          <label>Description</label>
+          <input type="text" id="s-description" required placeholder="e.g. Salary">
+        </div>
+        <div>
+          <label>Amount (€)</label>
+          <input type="number" id="s-amount" step="0.01" min="0.01" required placeholder="0.00">
+        </div>
+        <div>
+          <label>Date</label>
+          <input type="date" id="s-date" required>
+        </div>
+        <div>
+          <label>Type Category</label>
+          <select id="s-type">
+            <option value="A">A</option>
+            <option value="B">B</option>
+            <option value="C">C</option>
+          </select>
+        </div>
+        <div>
+          <label>Necessity Category</label>
+          <select id="s-necessity">
+            <option value="D">D</option>
+            <option value="E">E</option>
+            <option value="F">F</option>
+          </select>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-ghost" onclick="closeSingularModal()">Cancel</button>
+        <button type="submit" class="btn btn-primary">Save</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ── Recurring modal ── -->
+<div id="regular-modal" class="modal-bg" style="display:none">
+  <div class="modal">
+    <h3 id="regular-modal-title">Add Recurring Entry</h3>
+    <form id="regular-form" onsubmit="submitRegular(event)">
+      <input type="hidden" id="r-id">
+      <div class="form-grid">
+        <div class="full">
+          <div class="radio-group">
+            <input type="radio" name="r_kind" id="r-income" value="income" checked>
+            <label for="r-income">Income</label>
+            <input type="radio" name="r_kind" id="r-expense" value="expense">
+            <label for="r-expense">Expense</label>
+          </div>
+        </div>
+        <div class="full">
+          <label>Description</label>
+          <input type="text" id="r-description" required placeholder="e.g. Rent">
+        </div>
+        <div>
+          <label>Amount (€)</label>
+          <input type="number" id="r-amount" step="0.01" min="0.01" required placeholder="0.00">
+        </div>
+        <div>
+          <label>Periodicity</label>
+          <select id="r-periodicity">
+            <option value="monthly">Monthly</option>
+            <option value="yearly">Yearly</option>
+          </select>
+        </div>
+        <div>
+          <label>Start Date</label>
+          <input type="date" id="r-start" required>
+        </div>
+        <div>
+          <label>End Date</label>
+          <input type="date" id="r-end" required>
+        </div>
+        <div>
+          <label>Type Category</label>
+          <select id="r-type">
+            <option value="A">A</option>
+            <option value="B">B</option>
+            <option value="C">C</option>
+          </select>
+        </div>
+        <div>
+          <label>Necessity Category</label>
+          <select id="r-necessity">
+            <option value="D">D</option>
+            <option value="E">E</option>
+            <option value="F">F</option>
+          </select>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-ghost" onclick="closeRegularModal()">Cancel</button>
+        <button type="submit" class="btn btn-primary">Save</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ─── State ────────────────────────────────────────────────────────────────────
+const MONTHS = ['January','February','March','April','May','June',
+                'July','August','September','October','November','December'];
+let curYear, curMonth;
+
+// ─── Navigation ──────────────────────────────────────────────────────────────
+function showPage(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById('page-' + name).classList.add('active');
+  document.querySelectorAll('nav button').forEach((b, i) => {
+    b.classList.toggle('active', ['dashboard','singular','regular'][i] === name);
+  });
+  if (name === 'singular') loadSingular();
+  if (name === 'regular') loadRegular();
+}
+
+// ─── Dashboard ───────────────────────────────────────────────────────────────
+function initDashboard() {
+  const now = new Date();
+  curYear = now.getFullYear();
+  curMonth = now.getMonth() + 1;
+  loadSummary();
+}
+
+function prevMonth() {
+  curMonth--;
+  if (curMonth < 1) { curMonth = 12; curYear--; }
+  loadSummary();
+}
+
+function nextMonth() {
+  curMonth++;
+  if (curMonth > 12) { curMonth = 1; curYear++; }
+  loadSummary();
+}
+
+async function loadSummary() {
+  document.getElementById('month-label').textContent = `${MONTHS[curMonth-1]} ${curYear}`;
+  try {
+    const r = await fetch(`/api/month/${curYear}/${curMonth}`);
+    const d = await r.json();
+    setText('s-total-income',    fmt(d.total_income));
+    setText('s-total-expenses',  fmt(d.total_expenses));
+    const netEl = document.getElementById('s-net');
+    netEl.textContent = fmt(d.net);
+    netEl.className = 'card-value ' + (d.net >= 0 ? 'green' : 'red');
+    setText('s-singular-income',   fmt(d.singular_income));
+    setText('s-singular-expenses', fmt(d.singular_expenses));
+    setText('s-regular-income',    fmt(d.regular_income));
+    setText('s-regular-expenses',  fmt(d.regular_expenses));
+  } catch(e) { toast('Failed to load summary', 'error'); }
+}
+
+function setText(id, v) { document.getElementById(id).textContent = v; }
+function fmt(v) { return '€' + v.toFixed(2); }
+
+// ─── Singular table ───────────────────────────────────────────────────────────
+async function loadSingular() {
+  const tbody = document.getElementById('singular-tbody');
+  tbody.innerHTML = '<tr><td colspan="6" class="empty">Loading…</td></tr>';
+  try {
+    const r = await fetch('/api/singular');
+    const data = await r.json();
+    if (!data.length) {
+      tbody.innerHTML = '<tr><td colspan="6" class="empty">No entries yet.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = data.map(e => `
+      <tr>
+        <td>${e.date}</td>
+        <td>${esc(e.description)}</td>
+        <td class="${e.is_income ? 'amount-income' : 'amount-expense'}">
+          ${e.is_income ? '+' : '-'}${fmt(e.amount)}
+        </td>
+        <td><span class="badge badge-${e.type_category}">${e.type_category}</span></td>
+        <td><span class="badge badge-${e.necessity_category}">${e.necessity_category}</span></td>
+        <td style="white-space:nowrap">
+          <button class="btn btn-ghost btn-sm" onclick="editSingular(${e.id})">Edit</button>
+          <button class="btn btn-danger btn-sm" onclick="deleteSingular(${e.id})">Delete</button>
+        </td>
+      </tr>`).join('');
+  } catch(e) { toast('Failed to load entries', 'error'); }
+}
+
+// ─── Regular table ────────────────────────────────────────────────────────────
+async function loadRegular() {
+  const tbody = document.getElementById('regular-tbody');
+  tbody.innerHTML = '<tr><td colspan="8" class="empty">Loading…</td></tr>';
+  try {
+    const r = await fetch('/api/regular');
+    const data = await r.json();
+    if (!data.length) {
+      tbody.innerHTML = '<tr><td colspan="8" class="empty">No entries yet.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = data.map(e => {
+      const monthly = e.periodicity === 'yearly' ? e.amount / 12 : e.amount;
+      return `<tr>
+        <td>${esc(e.description)}</td>
+        <td class="${e.is_income ? 'amount-income' : 'amount-expense'}">
+          ${e.is_income ? '+' : '-'}${fmt(monthly)}
+        </td>
+        <td><span class="badge badge-${e.periodicity}">${e.periodicity}</span></td>
+        <td>${e.start_date}</td>
+        <td>${e.end_date}</td>
+        <td><span class="badge badge-${e.type_category}">${e.type_category}</span></td>
+        <td><span class="badge badge-${e.necessity_category}">${e.necessity_category}</span></td>
+        <td style="white-space:nowrap">
+          <button class="btn btn-ghost btn-sm" onclick="editRegular(${e.id})">Edit</button>
+          <button class="btn btn-danger btn-sm" onclick="deleteRegular(${e.id})">Delete</button>
+        </td>
+      </tr>`;
+    }).join('');
+  } catch(e) { toast('Failed to load entries', 'error'); }
+}
+
+// ─── Singular modal ───────────────────────────────────────────────────────────
+function openSingularModal(entry) {
+  document.getElementById('singular-modal-title').textContent =
+    entry ? 'Edit One-time Entry' : 'Add One-time Entry';
+  document.getElementById('s-id').value = entry ? entry.id : '';
+  document.getElementById('s-description').value = entry ? entry.description : '';
+  document.getElementById('s-amount').value = entry ? entry.amount : '';
+  document.getElementById('s-date').value = entry ? entry.date : today();
+  document.getElementById('s-type').value = entry ? entry.type_category : 'A';
+  document.getElementById('s-necessity').value = entry ? entry.necessity_category : 'D';
+  document.getElementById(entry && entry.is_income ? 's-income' : 's-expense').checked = true;
+  document.getElementById('singular-modal').style.display = 'flex';
+}
+
+function closeSingularModal() {
+  document.getElementById('singular-modal').style.display = 'none';
+}
+
+async function submitSingular(e) {
+  e.preventDefault();
+  const id = document.getElementById('s-id').value;
+  const body = {
+    description: document.getElementById('s-description').value,
+    amount: parseFloat(document.getElementById('s-amount').value),
+    date: document.getElementById('s-date').value,
+    type_category: document.getElementById('s-type').value,
+    necessity_category: document.getElementById('s-necessity').value,
+    is_income: document.getElementById('s-income').checked,
+  };
+  try {
+    const method = id ? 'PUT' : 'POST';
+    const url = id ? `/api/singular/${id}` : '/api/singular';
+    const r = await fetch(url, { method, headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
+    if (!r.ok) throw new Error(await r.text());
+    toast(id ? 'Entry updated' : 'Entry added', 'success');
+    closeSingularModal();
+    loadSingular();
+    if (curYear) loadSummary();
+  } catch(err) { toast('Error: ' + err.message, 'error'); }
+}
+
+async function editSingular(id) {
+  const r = await fetch(`/api/singular/${id}`);
+  const e = await r.json();
+  openSingularModal(e);
+}
+
+async function deleteSingular(id) {
+  if (!confirm('Delete this entry?')) return;
+  const r = await fetch(`/api/singular/${id}`, { method: 'DELETE' });
+  if (r.ok) { toast('Entry deleted', 'success'); loadSingular(); if (curYear) loadSummary(); }
+  else toast('Delete failed', 'error');
+}
+
+// ─── Regular modal ────────────────────────────────────────────────────────────
+function openRegularModal(entry) {
+  document.getElementById('regular-modal-title').textContent =
+    entry ? 'Edit Recurring Entry' : 'Add Recurring Entry';
+  document.getElementById('r-id').value = entry ? entry.id : '';
+  document.getElementById('r-description').value = entry ? entry.description : '';
+  document.getElementById('r-amount').value = entry ? entry.amount : '';
+  document.getElementById('r-periodicity').value = entry ? entry.periodicity : 'monthly';
+  document.getElementById('r-start').value = entry ? entry.start_date : today();
+  document.getElementById('r-end').value = entry ? entry.end_date : '';
+  document.getElementById('r-type').value = entry ? entry.type_category : 'A';
+  document.getElementById('r-necessity').value = entry ? entry.necessity_category : 'D';
+  document.getElementById(entry && entry.is_income ? 'r-income' : 'r-expense').checked = true;
+  document.getElementById('regular-modal').style.display = 'flex';
+}
+
+function closeRegularModal() {
+  document.getElementById('regular-modal').style.display = 'none';
+}
+
+async function submitRegular(e) {
+  e.preventDefault();
+  const id = document.getElementById('r-id').value;
+  const body = {
+    description: document.getElementById('r-description').value,
+    amount: parseFloat(document.getElementById('r-amount').value),
+    periodicity: document.getElementById('r-periodicity').value,
+    start_date: document.getElementById('r-start').value,
+    end_date: document.getElementById('r-end').value,
+    type_category: document.getElementById('r-type').value,
+    necessity_category: document.getElementById('r-necessity').value,
+    is_income: document.getElementById('r-income').checked,
+  };
+  try {
+    const method = id ? 'PUT' : 'POST';
+    const url = id ? `/api/regular/${id}` : '/api/regular';
+    const r = await fetch(url, { method, headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
+    if (!r.ok) throw new Error(await r.text());
+    toast(id ? 'Entry updated' : 'Entry added', 'success');
+    closeRegularModal();
+    loadRegular();
+    if (curYear) loadSummary();
+  } catch(err) { toast('Error: ' + err.message, 'error'); }
+}
+
+async function editRegular(id) {
+  const r = await fetch(`/api/regular/${id}`);
+  const e = await r.json();
+  openRegularModal(e);
+}
+
+async function deleteRegular(id) {
+  if (!confirm('Delete this entry?')) return;
+  const r = await fetch(`/api/regular/${id}`, { method: 'DELETE' });
+  if (r.ok) { toast('Entry deleted', 'success'); loadRegular(); if (curYear) loadSummary(); }
+  else toast('Delete failed', 'error');
+}
+
+// ─── Utilities ────────────────────────────────────────────────────────────────
+function today() {
+  return new Date().toISOString().split('T')[0];
+}
+
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+let toastTimer;
+function toast(msg, type) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'show ' + (type || '');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { el.className = ''; }, 3000);
+}
+
+// Close modals on backdrop click
+document.getElementById('singular-modal').addEventListener('click', function(e) {
+  if (e.target === this) closeSingularModal();
+});
+document.getElementById('regular-modal').addEventListener('click', function(e) {
+  if (e.target === this) closeRegularModal();
+});
+
+// ─── Init ─────────────────────────────────────────────────────────────────────
+initDashboard();
+</script>
+</body>
+</html>
