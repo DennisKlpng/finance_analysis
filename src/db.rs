@@ -8,9 +8,15 @@ pub struct Database {
 
 impl Database {
     pub fn new(path: &str) -> Result<Self> {
+        let is_new = std::fs::metadata(path)
+            .map(|m| m.len() == 0)
+            .unwrap_or(true); // file doesn't exist → treat as new
+
         let conn = Connection::open(path)?;
         let db = Database { conn };
-        db.initialize()?;
+        if is_new {
+            db.initialize()?;
+        }
         Ok(db)
     }
 
