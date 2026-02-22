@@ -273,6 +273,81 @@ impl Database {
             net: total_income - total_expenses,
         })
     }
+
+    /// Get summary for all 12 months of a given year
+    pub fn get_year_summary(&self, year: i32) -> Result<Vec<MonthSummary>> {
+        let mut summaries = Vec::new();
+        for month in 1..=12 {
+            summaries.push(self.get_month_summary(year, month)?);
+        }
+        Ok(summaries)
+    }
+
+    /// Get expense distribution by category for a given month
+    pub fn get_expense_distribution(&self, year: i32, month: u32) -> Result<(Vec<(String, f64)>, Vec<(String, f64)>)> {
+        let month_start = NaiveDate::from_ymd_opt(year, month, 1).unwrap();
+        let next_month_start = if month == 12 {
+            NaiveDate::from_ymd_opt(year + 1, 1, 1).unwrap()
+        } else {
+            NaiveDate::from_ymd_opt(year, month + 1, 1).unwrap()
+        };
+        let month_end = next_month_start.pred_opt().unwrap();
+
+        // Type distribution from singular expenses
+        let mut type_dist: std::collections::HashMap<String, f64> = std::collections::HashMap::new();
+        let mut necessity_dist: std::collections::HashMap<String, f64> = std::collections::HashMap::new();
+
+        // Singular expenses
+        let mut stmt = self.conn.prepare(
+            "SELECT amount, type_category, necessity_category FROM singular_entries
+             WHERE date >= ?1 AND date <= ?2 AND is_income = 0",
+        )?;
+        let rows = stmt.query_map(
+            params![month_start.to_string(), month_end.to_string()],
+            |row| {
+                let amount: f64 = row.get(0)?;
+                let type_cat: String = row.get(1)?;
+                let nec_cat: String = row.get(2)?;
+                Ok((amount, type_cat, nec_cat))
+            },
+        )?;
+        for row in rows {
+            let (amount, type_cat, nec_cat) = row?;
+            *type_dist.entry(type_cat).or_insert(0.0) += amount;
+            *necessity_dist.entry(nec_cat).or_insert(0.0) += amount;
+        }
+
+        // Regular expenses
+        let mut stmt = self.conn.prepare(
+            "SELECT amount, periodicity, type_category, necessity_category FROM regular_entries
+             WHERE start_date <= ?2 AND end_date >= ?1 AND is_income = 0",
+        )?;
+        let rows = stmt.query_map(
+            params![month_start.to_string(), month_end.to_string()],
+            |row| {
+                let amount: f64 = row.get(0)?;
+                let periodicity: String = row.get(1)?;
+                let type_cat: String = row.get(2)?;
+                let nec_cat: String = row.get(3)?;
+                Ok((amount, periodicity, type_cat, nec_cat))
+            },
+        )?;
+        for row in rows {
+            let (amount, periodicity, type_cat, nec_cat) = row?;
+            let monthly_amount = if periodicity == "yearly" {
+                amount / 12.0
+            } else {
+                amount
+            };
+            *type_dist.entry(type_cat).or_insert(0.0) += monthly_amount;
+            *necessity_dist.entry(nec_cat).or_insert(0.0) += monthly_amount;
+        }
+
+        let type_vec: Vec<(String, f64)> = type_dist.into_iter().collect();
+        let necessity_vec: Vec<(String, f64)> = necessity_dist.into_iter().collect();
+
+        Ok((type_vec, necessity_vec))
+    }
 }
 
 // ─── Row mapping helpers ──────────────────────────────────────────────────────

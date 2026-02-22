@@ -50,6 +50,10 @@ async fn main() -> anyhow::Result<()> {
         .route("/api/month/:year/:month", get(month_summary))
         // Available months for navigation
         .route("/api/months", get(available_months))
+        // Yearly summary
+        .route("/api/year/:year", get(year_summary))
+        // Expense distribution
+        .route("/api/expenses/distribution/:year/:month", get(expense_distribution))
         .layer(cors)
         .with_state(state);
 

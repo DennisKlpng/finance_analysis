@@ -201,3 +201,37 @@ pub async fn available_months(State(db): State<AppState>) -> Response {
 
     Json(result).into_response()
 }
+
+// ─── Yearly summary ───────────────────────────────────────────────────────────
+
+pub async fn year_summary(State(db): State<AppState>, Path(year): Path<i32>) -> Response {
+    let db = db.lock().unwrap();
+    match db.get_year_summary(year) {
+        Ok(summaries) => Json(summaries).into_response(),
+        Err(e) => db_err(e),
+    }
+}
+
+// ─── Expense distribution ─────────────────────────────────────────────────────
+
+pub async fn expense_distribution(
+    State(db): State<AppState>,
+    Path((year, month)): Path<(i32, u32)>,
+) -> Response {
+    if month < 1 || month > 12 {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({ "error": "month must be 1-12" })),
+        )
+            .into_response();
+    }
+    let db = db.lock().unwrap();
+    match db.get_expense_distribution(year, month) {
+        Ok((type_dist, necessity_dist)) => Json(json!({
+            "type_distribution": type_dist,
+            "necessity_distribution": necessity_dist
+        }))
+        .into_response(),
+        Err(e) => db_err(e),
+    }
+}

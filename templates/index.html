@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Finance Analysis</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   :root {
@@ -63,15 +64,10 @@
 
   /* Badge */
   .badge { display: inline-block; padding: 2px 8px; border-radius: 99px;
-           font-size: 11px; font-weight: 600; }
-  .badge-A { background: #4f46e530; color: #818cf8; }
-  .badge-B { background: #06b6d430; color: #22d3ee; }
-  .badge-C { background: #8b5cf630; color: #c4b5fd; }
-  .badge-D { background: #22c55e30; color: #86efac; }
-  .badge-E { background: #eab30830; color: #fde047; }
-  .badge-F { background: #ef444430; color: #fca5a5; }
-  .badge-monthly { background: #0ea5e930; color: #38bdf8; }
-  .badge-yearly  { background: #a855f730; color: #d8b4fe; }
+           font-size: 11px; font-weight: 600; background: var(--surface2);
+           color: var(--text2); border: 1px solid var(--border); }
+  .badge-monthly { background: #0ea5e930; color: #38bdf8; border-color: #0ea5e950; }
+  .badge-yearly  { background: #a855f730; color: #d8b4fe; border-color: #a855f750; }
 
   /* Buttons */
   .btn { padding: 7px 14px; border-radius: var(--radius); border: none;
@@ -129,6 +125,27 @@
   .page.active { display: block; }
 
   .empty { color: var(--text3); text-align: center; padding: 40px; font-size: 15px; }
+
+  /* Year overview */
+  .year-nav { display: flex; align-items: center; gap: 12px; margin-bottom: 24px; }
+  .year-nav button { background: var(--surface2); border: 1px solid var(--border); color: var(--text);
+                     padding: 6px 12px; border-radius: var(--radius); cursor: pointer; font-size: 18px; }
+  .year-nav button:hover { background: var(--border); }
+  .year-label { font-size: 20px; font-weight: 700; min-width: 100px; text-align: center; }
+  .charts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-top: 24px; }
+  .chart-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+                padding: 20px; }
+  .chart-card h3 { font-size: 15px; font-weight: 600; margin-bottom: 16px; text-align: center; }
+  .chart-container { position: relative; height: 300px; }
+  @media (max-width: 900px) {
+    .charts-grid { grid-template-columns: 1fr; }
+  }
+  .year-table { margin-top: 0; }
+  .year-table th { text-align: right; }
+  .year-table th:first-child { text-align: left; }
+  .year-table td { text-align: right; }
+  .year-table td:first-child { text-align: left; font-weight: 600; }
+  .totals-row { border-top: 2px solid var(--border) !important; font-weight: 700; }
 </style>
 </head>
 <body>
@@ -136,15 +153,54 @@
 <header>
   <h1>Finance Analysis</h1>
   <nav>
-    <button class="active" onclick="showPage('dashboard')">Dashboard</button>
+    <button class="active" onclick="showPage('year')">Year Overview</button>
+    <button onclick="showPage('dashboard')">Monthly</button>
     <button onclick="showPage('singular')">One-time</button>
     <button onclick="showPage('regular')">Recurring</button>
   </nav>
 </header>
 
 <main>
+  <!-- ── Year Overview ── -->
+  <section id="page-year" class="page active">
+    <div class="year-nav">
+      <button onclick="prevYear()">&#8249;</button>
+      <span class="year-label" id="year-label">Loading…</span>
+      <button onclick="nextYear()">&#8250;</button>
+    </div>
+
+    <div class="card table-wrap">
+      <table class="year-table">
+        <thead>
+          <tr>
+            <th>Month</th>
+            <th>Income</th>
+            <th>Expenses</th>
+            <th>Balance</th>
+          </tr>
+        </thead>
+        <tbody id="year-tbody"></tbody>
+      </table>
+    </div>
+
+    <div class="charts-grid">
+      <div class="chart-card">
+        <h3>Expenses by Type</h3>
+        <div class="chart-container">
+          <canvas id="type-chart"></canvas>
+        </div>
+      </div>
+      <div class="chart-card">
+        <h3>Expenses by Necessity</h3>
+        <div class="chart-container">
+          <canvas id="necessity-chart"></canvas>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <!-- ── Dashboard ── -->
-  <section id="page-dashboard" class="page active">
+  <section id="page-dashboard" class="page">
     <div class="month-nav">
       <button onclick="prevMonth()">&#8249;</button>
       <span class="month-label" id="month-label">Loading…</span>
@@ -237,17 +293,24 @@
         <div>
           <label>Type Category</label>
           <select id="s-type">
-            <option value="A">A</option>
-            <option value="B">B</option>
-            <option value="C">C</option>
+            <option value="Lebensmittel&Haushaltsbedarf">Lebensmittel & Haushaltsbedarf</option>
+            <option value="Freizeit">Freizeit</option>
+            <option value="Mobilität">Mobilität</option>
+            <option value="Kleidung">Kleidung</option>
+            <option value="Elektronik">Elektronik</option>
+            <option value="Wohnungseinrichtung">Wohnungseinrichtung</option>
+            <option value="Urlaub">Urlaub</option>
+            <option value="Miete">Miete</option>
+            <option value="Versicherungen">Versicherungen</option>
+            <option value="Sonstiges">Sonstiges</option>
           </select>
         </div>
         <div>
           <label>Necessity Category</label>
           <select id="s-necessity">
-            <option value="D">D</option>
-            <option value="E">E</option>
-            <option value="F">F</option>
+            <option value="Notwendig">Notwendig</option>
+            <option value="Nützlich">Nützlich</option>
+            <option value="Luxus">Luxus</option>
           </select>
         </div>
       </div>
@@ -300,17 +363,24 @@
         <div>
           <label>Type Category</label>
           <select id="r-type">
-            <option value="A">A</option>
-            <option value="B">B</option>
-            <option value="C">C</option>
+            <option value="Lebensmittel&Haushaltsbedarf">Lebensmittel & Haushaltsbedarf</option>
+            <option value="Freizeit">Freizeit</option>
+            <option value="Mobilität">Mobilität</option>
+            <option value="Kleidung">Kleidung</option>
+            <option value="Elektronik">Elektronik</option>
+            <option value="Wohnungseinrichtung">Wohnungseinrichtung</option>
+            <option value="Urlaub">Urlaub</option>
+            <option value="Miete">Miete</option>
+            <option value="Versicherungen">Versicherungen</option>
+            <option value="Sonstiges">Sonstiges</option>
           </select>
         </div>
         <div>
           <label>Necessity Category</label>
           <select id="r-necessity">
-            <option value="D">D</option>
-            <option value="E">E</option>
-            <option value="F">F</option>
+            <option value="Notwendig">Notwendig</option>
+            <option value="Nützlich">Nützlich</option>
+            <option value="Luxus">Luxus</option>
           </select>
         </div>
       </div>
@@ -329,16 +399,144 @@
 const MONTHS = ['January','February','March','April','May','June',
                 'July','August','September','October','November','December'];
 let curYear, curMonth;
+let viewYear; // for year overview
+let typeChart, necessityChart; // Chart.js instances
 
 // ─── Navigation ──────────────────────────────────────────────────────────────
 function showPage(name) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.getElementById('page-' + name).classList.add('active');
   document.querySelectorAll('nav button').forEach((b, i) => {
-    b.classList.toggle('active', ['dashboard','singular','regular'][i] === name);
+    b.classList.toggle('active', ['year','dashboard','singular','regular'][i] === name);
   });
   if (name === 'singular') loadSingular();
   if (name === 'regular') loadRegular();
+  if (name === 'year') loadYearOverview();
+}
+
+// ─── Year Overview ───────────────────────────────────────────────────────────
+function initYearOverview() {
+  const now = new Date();
+  viewYear = now.getFullYear();
+  loadYearOverview();
+}
+
+function prevYear() {
+  viewYear--;
+  loadYearOverview();
+}
+
+function nextYear() {
+  viewYear++;
+  loadYearOverview();
+}
+
+async function loadYearOverview() {
+  document.getElementById('year-label').textContent = viewYear;
+  try {
+    const r = await fetch(`/api/year/${viewYear}`);
+    const months = await r.json();
+
+    // Build table
+    const tbody = document.getElementById('year-tbody');
+    let yearIncome = 0, yearExpenses = 0;
+    const rows = months.map((m, i) => {
+      yearIncome += m.total_income;
+      yearExpenses += m.total_expenses;
+      const net = m.total_income - m.total_expenses;
+      return `<tr>
+        <td>${MONTHS[i]}</td>
+        <td class="amount-income">${fmt(m.total_income)}</td>
+        <td class="amount-expense">${fmt(m.total_expenses)}</td>
+        <td class="${net >= 0 ? 'amount-income' : 'amount-expense'}">${fmt(net)}</td>
+      </tr>`;
+    });
+    const yearNet = yearIncome - yearExpenses;
+    rows.push(`<tr class="totals-row">
+      <td>Year Total</td>
+      <td class="amount-income">${fmt(yearIncome)}</td>
+      <td class="amount-expense">${fmt(yearExpenses)}</td>
+      <td class="${yearNet >= 0 ? 'amount-income' : 'amount-expense'}">${fmt(yearNet)}</td>
+    </tr>`);
+    tbody.innerHTML = rows.join('');
+
+    // Load charts for current month
+    const now = new Date();
+    const chartMonth = (viewYear === now.getFullYear()) ? now.getMonth() + 1 : 12;
+    await loadCharts(viewYear, chartMonth);
+  } catch(e) {
+    toast('Failed to load year overview', 'error');
+  }
+}
+
+async function loadCharts(year, month) {
+  try {
+    const r = await fetch(`/api/expenses/distribution/${year}/${month}`);
+    const data = await r.json();
+
+    // Destroy old charts if they exist
+    if (typeChart) typeChart.destroy();
+    if (necessityChart) necessityChart.destroy();
+
+    // Type distribution chart
+    const typeLabels = data.type_distribution.map(d => d[0]);
+    const typeValues = data.type_distribution.map(d => d[1]);
+    const typeCtx = document.getElementById('type-chart').getContext('2d');
+    typeChart = new Chart(typeCtx, {
+      type: 'pie',
+      data: {
+        labels: typeLabels,
+        datasets: [{
+          data: typeValues,
+          backgroundColor: [
+            '#6366f1', '#8b5cf6', '#ec4899', '#f43f5e', '#f97316',
+            '#f59e0b', '#84cc16', '#10b981', '#14b8a6', '#06b6d4'
+          ]
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { position: 'bottom', labels: { color: '#e2e8f0', padding: 12 } },
+          tooltip: {
+            callbacks: {
+              label: ctx => `${ctx.label}: €${ctx.parsed.toFixed(2)}`
+            }
+          }
+        }
+      }
+    });
+
+    // Necessity distribution chart
+    const necLabels = data.necessity_distribution.map(d => d[0]);
+    const necValues = data.necessity_distribution.map(d => d[1]);
+    const necCtx = document.getElementById('necessity-chart').getContext('2d');
+    necessityChart = new Chart(necCtx, {
+      type: 'pie',
+      data: {
+        labels: necLabels,
+        datasets: [{
+          data: necValues,
+          backgroundColor: ['#22c55e', '#eab308', '#ef4444']
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { position: 'bottom', labels: { color: '#e2e8f0', padding: 12 } },
+          tooltip: {
+            callbacks: {
+              label: ctx => `${ctx.label}: €${ctx.parsed.toFixed(2)}`
+            }
+          }
+        }
+      }
+    });
+  } catch(e) {
+    console.error('Failed to load charts:', e);
+  }
 }
 
 // ─── Dashboard ───────────────────────────────────────────────────────────────
@@ -580,6 +778,7 @@ document.getElementById('regular-modal').addEventListener('click', function(e) {
 });
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
+initYearOverview();
 initDashboard();
 </script>
 </body>
