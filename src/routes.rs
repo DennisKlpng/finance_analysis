@@ -2,7 +2,7 @@ use std::sync::{Arc, Mutex};
 
 use chrono::Datelike;
 use axum::{
-    extract::{Path, State},
+    extract::{Multipart, Path, State},
     http::StatusCode,
     response::{Html, IntoResponse, Response},
     Json,
@@ -233,5 +233,85 @@ pub async fn expense_distribution(
         }))
         .into_response(),
         Err(e) => db_err(e),
+    }
+}
+
+// ─── Excel Import ─────────────────────────────────────────────────────────────
+
+pub async fn import_excel(
+    State(db): State<AppState>,
+    mut multipart: Multipart,
+) -> Response {
+    // Extract file and year from multipart form
+    let mut file_data: Option<Vec<u8>> = None;
+    let mut year: Option<i32> = None;
+
+    while let Ok(Some(field)) = multipart.next_field().await {
+        let name = field.name().unwrap_or("").to_string();
+
+        if name == "file" {
+            let data = field.bytes().await.unwrap_or_default();
+            file_data = Some(data.to_vec());
+        } else if name == "year" {
+            let text = field.text().await.unwrap_or_default();
+            year = text.parse().ok();
+        }
+    }
+
+    let file_data = match file_data {
+        Some(d) => d,
+        None => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(json!({ "error": "No file uploaded" })),
+            )
+                .into_response();
+        }
+    };
+
+    let year = match year {
+        Some(y) => y,
+        None => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(json!({ "error": "Year parameter missing" })),
+            )
+                .into_response();
+        }
+    };
+
+    // Save temp file
+    let temp_path = std::env::temp_dir().join(format!("finance_import_{}.xlsx", year));
+    if let Err(e) = std::fs::write(&temp_path, &file_data) {
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": format!("Failed to save temp file: {}", e) })),
+        )
+            .into_response();
+    }
+
+    // Import
+    let db_guard = db.lock().unwrap();
+    let result = crate::import::import_excel(&temp_path, "excel_mapping.json", &db_guard, year);
+    drop(db_guard);
+
+    // Clean up temp file
+    let _ = std::fs::remove_file(&temp_path);
+
+    match result {
+        Ok(stats) => Json(json!({
+            "success": true,
+            "regular_expenses": stats.regular_expenses,
+            "singular_expenses": stats.singular_expenses,
+            "regular_incomes": stats.regular_incomes,
+            "singular_incomes": stats.singular_incomes,
+            "errors": stats.errors
+        }))
+        .into_response(),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": e.to_string() })),
+        )
+            .into_response(),
     }
 }

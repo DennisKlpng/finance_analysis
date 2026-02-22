@@ -1,11 +1,12 @@
 mod db;
+mod import;
 mod models;
 mod routes;
 
 use std::sync::{Arc, Mutex};
 
 use axum::{
-    routing::get,
+    routing::{get, post},
     Router,
 };
 use tower_http::cors::{Any, CorsLayer};
@@ -54,6 +55,8 @@ async fn main() -> anyhow::Result<()> {
         .route("/api/year/:year", get(year_summary))
         // Expense distribution
         .route("/api/expenses/distribution/:year/:month", get(expense_distribution))
+        // Excel import
+        .route("/api/import/excel", post(import_excel))
         .layer(cors)
         .with_state(state);
 

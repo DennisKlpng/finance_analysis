@@ -1,0 +1,38 @@
+{
+  "_comment": "Excel Import Mapping Configuration",
+  "_instructions": "Copy this file to 'excel_mapping.json' and fill in your actual category values from Excel",
+
+  "type_category_recurring": {
+    "Example_Category_From_Excel_Cell_C": "Lebensmittel&Haushaltsbedarf",
+    "Another_Example": "Freizeit"
+  },
+
+  "type_category_singular": {
+    "Example_Category_From_Excel_Cell_C": "Mobilität",
+    "Another_Example": "Kleidung"
+  },
+
+  "necessity_category": {
+    "Example_Necessity_From_Excel_Cell_D": "Notwendig",
+    "Another_Example": "Nützlich"
+  },
+
+  "_available_type_categories": [
+    "Lebensmittel&Haushaltsbedarf",
+    "Freizeit",
+    "Mobilität",
+    "Kleidung",
+    "Elektronik",
+    "Wohnungseinrichtung",
+    "Urlaub",
+    "Miete",
+    "Versicherungen",
+    "Sonstiges"
+  ],
+
+  "_available_necessity_categories": [
+    "Notwendig",
+    "Nützlich",
+    "Luxus"
+  ]
+}

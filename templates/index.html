@@ -158,6 +158,7 @@
     <button onclick="showPage('singular')">One-time</button>
     <button onclick="showPage('regular')">Recurring</button>
   </nav>
+  <button class="btn btn-ghost" onclick="openImportModal()" style="margin-left: auto;">📥 Import Excel</button>
 </header>
 
 <main>
@@ -387,6 +388,37 @@
       <div class="modal-actions">
         <button type="button" class="btn btn-ghost" onclick="closeRegularModal()">Cancel</button>
         <button type="submit" class="btn btn-primary">Save</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ── Import modal ── -->
+<div id="import-modal" class="modal-bg" style="display:none">
+  <div class="modal">
+    <h3>Import from Excel</h3>
+    <form id="import-form" onsubmit="submitImport(event)">
+      <div class="form-grid">
+        <div class="full">
+          <label>Excel File</label>
+          <input type="file" id="import-file" accept=".xlsx,.xls" required>
+          <p style="font-size: 12px; color: var(--text3); margin-top: 6px;">
+            Select an Excel file with expenses (sheet 2) and incomes (sheet 3)
+          </p>
+        </div>
+        <div class="full">
+          <label>Year</label>
+          <input type="number" id="import-year" min="2000" max="2100" required placeholder="e.g. 2025">
+        </div>
+      </div>
+      <div id="import-result" style="margin-top: 16px; display: none;">
+        <div style="padding: 12px; background: var(--surface2); border-radius: var(--radius); font-size: 13px;">
+          <div id="import-stats"></div>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-ghost" onclick="closeImportModal()">Cancel</button>
+        <button type="submit" class="btn btn-primary" id="import-submit-btn">Import</button>
       </div>
     </form>
   </div>
@@ -776,6 +808,86 @@ document.getElementById('singular-modal').addEventListener('click', function(e) 
 document.getElementById('regular-modal').addEventListener('click', function(e) {
   if (e.target === this) closeRegularModal();
 });
+document.getElementById('import-modal').addEventListener('click', function(e) {
+  if (e.target === this) closeImportModal();
+});
+
+// ─── Import ──────────────────────────────────────────────────────────────────
+function openImportModal() {
+  const now = new Date();
+  document.getElementById('import-year').value = now.getFullYear();
+  document.getElementById('import-result').style.display = 'none';
+  document.getElementById('import-modal').style.display = 'flex';
+}
+
+function closeImportModal() {
+  document.getElementById('import-form').reset();
+  document.getElementById('import-result').style.display = 'none';
+  document.getElementById('import-modal').style.display = 'none';
+}
+
+async function submitImport(e) {
+  e.preventDefault();
+  const fileInput = document.getElementById('import-file');
+  const yearInput = document.getElementById('import-year');
+  const submitBtn = document.getElementById('import-submit-btn');
+  const resultDiv = document.getElementById('import-result');
+  const statsDiv = document.getElementById('import-stats');
+
+  if (!fileInput.files || !fileInput.files[0]) {
+    toast('Please select a file', 'error');
+    return;
+  }
+
+  const formData = new FormData();
+  formData.append('file', fileInput.files[0]);
+  formData.append('year', yearInput.value);
+
+  submitBtn.disabled = true;
+  submitBtn.textContent = 'Importing...';
+  resultDiv.style.display = 'none';
+
+  try {
+    const r = await fetch('/api/import/excel', {
+      method: 'POST',
+      body: formData
+    });
+    const result = await r.json();
+
+    if (!r.ok) {
+      throw new Error(result.error || 'Import failed');
+    }
+
+    // Show results
+    let html = `<strong>Import successful!</strong><br><br>`;
+    html += `✓ ${result.regular_expenses} regular expenses<br>`;
+    html += `✓ ${result.singular_expenses} one-time expenses<br>`;
+    html += `✓ ${result.regular_incomes} regular incomes<br>`;
+    html += `✓ ${result.singular_incomes} one-time incomes`;
+
+    if (result.errors && result.errors.length > 0) {
+      html += `<br><br><strong style="color: var(--yellow);">Warnings:</strong><br>`;
+      html += result.errors.slice(0, 5).map(e => `⚠ ${esc(e)}`).join('<br>');
+      if (result.errors.length > 5) {
+        html += `<br>...and ${result.errors.length - 5} more`;
+      }
+    }
+
+    statsDiv.innerHTML = html;
+    resultDiv.style.display = 'block';
+
+    toast('Import complete', 'success');
+
+    // Refresh current view
+    if (viewYear) loadYearOverview();
+    if (curYear) loadSummary();
+  } catch(err) {
+    toast('Import failed: ' + err.message, 'error');
+  } finally {
+    submitBtn.disabled = false;
+    submitBtn.textContent = 'Import';
+  }
+}
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
 initYearOverview();
