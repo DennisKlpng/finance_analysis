@@ -92,11 +92,11 @@ fn import_expenses_sheet(
     let (height, _) = sheet.get_size();
 
     for row_idx in 0..height {
-        // Check for "Variable Kosten" marker
-        if let Some(cell) = sheet.get((row_idx, 0)) {
-            if cell.to_string().contains("Variable Kosten") {
+        // Check if this row contains the marker text (in any column)
+        if !in_singular_section {
+            if row_contains_marker(sheet, row_idx, "Variable Kosten") {
                 in_singular_section = true;
-                continue;
+                continue; // Skip the marker row itself
             }
         }
 
@@ -111,7 +111,7 @@ fn import_expenses_sheet(
                     }
                 }
                 Ok(None) => {} // Empty row
-                Err(e) => stats.errors.push(format!("Row {}: {}", row_idx + 1, e)),
+                Err(e) => stats.errors.push(format!("Row {} (singular): {}", row_idx + 1, e)),
             }
         } else {
             // Regular expense: C=type, D=necessity, E=periodicity, G=amount, H=description, I=start_month, J=end_month
@@ -143,13 +143,12 @@ fn import_incomes_sheet(
     let (height, _) = sheet.get_size();
 
     for row_idx in 0..height {
-        // Check for separator (empty description in column F for regular, or specific marker)
-        // For now, let's use a simple heuristic: if column B has a date and column C is empty, it's singular
-        let has_date_in_b = sheet.get((row_idx, 1)).and_then(|c| parse_excel_date(c, year).ok()).is_some();
-        let c_empty = sheet.get((row_idx, 2)).map_or(true, |c| matches!(c, Data::Empty));
-
-        if has_date_in_b && c_empty {
-            in_singular_section = true;
+        // Check if this row contains the marker text (in any column)
+        if !in_singular_section {
+            if row_contains_marker(sheet, row_idx, "Variable Einnahmen") {
+                in_singular_section = true;
+                continue; // Skip the marker row itself
+            }
         }
 
         if in_singular_section {
@@ -317,6 +316,18 @@ fn parse_singular_income(
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
+fn row_contains_marker(sheet: &calamine::Range<Data>, row: usize, marker: &str) -> bool {
+    let (_, width) = sheet.get_size();
+    for col in 0..width {
+        if let Some(cell) = sheet.get((row, col)) {
+            if cell.to_string().contains(marker) {
+                return true;
+            }
+        }
+    }
+    false
+}
+
 fn get_string(sheet: &calamine::Range<Data>, row: usize, col: usize) -> Result<String> {
     let cell = sheet.get((row, col)).ok_or_else(|| anyhow!("Missing cell"))?;
     let s = cell.to_string().trim().to_string();
@@ -332,7 +343,11 @@ fn get_f64(sheet: &calamine::Range<Data>, row: usize, col: usize) -> Result<f64>
     match cell {
         Data::Float(f) => Ok(*f),
         Data::Int(i) => Ok(*i as f64),
-        Data::String(s) => s.parse::<f64>().context("Failed to parse amount"),
+        Data::String(s) => {
+            // Handle German number format: replace comma with period
+            let normalized = s.replace(',', ".");
+            normalized.parse::<f64>().context("Failed to parse amount")
+        }
         Data::Empty => Ok(0.0),
         _ => Err(anyhow!("Invalid number format")),
     }
@@ -363,19 +378,32 @@ fn parse_excel_date(cell: &Data, _year: i32) -> Result<NaiveDate> {
             let date = base + chrono::Duration::days(days as i64);
             Ok(date)
         }
+        Data::DateTimeIso(iso_str) => {
+            // ISO date string from ODS files
+            NaiveDate::parse_from_str(iso_str, "%Y-%m-%d")
+                .context("Failed to parse ISO date")
+        }
         Data::String(s) => {
             // Try common formats
-            NaiveDate::parse_from_str(s, "%d.%m.%Y")
-                .or_else(|_| NaiveDate::parse_from_str(s, "%Y-%m-%d"))
-                .or_else(|_| NaiveDate::parse_from_str(s, "%d/%m/%Y"))
+            NaiveDate::parse_from_str(s, "%d.%m.%Y")   // 01.02.2025
+                .or_else(|_| NaiveDate::parse_from_str(s, "%d.%m.%y"))  // 01.02.25
+                .or_else(|_| NaiveDate::parse_from_str(s, "%Y-%m-%d"))  // 2025-02-01
+                .or_else(|_| NaiveDate::parse_from_str(s, "%d/%m/%Y"))  // 01/02/2025
                 .context("Failed to parse date string")
+        }
+        Data::Int(days) => {
+            // Excel date as integer serial number
+            let base = NaiveDate::from_ymd_opt(1899, 12, 30).unwrap();
+            let date = base + chrono::Duration::days(*days as i64);
+            Ok(date)
         }
         Data::Float(days) => {
             let base = NaiveDate::from_ymd_opt(1899, 12, 30).unwrap();
             let date = base + chrono::Duration::days(*days as i64);
             Ok(date)
         }
-        _ => Err(anyhow!("Invalid date format")),
+        Data::Empty => Err(anyhow!("Empty date cell")),
+        _ => Err(anyhow!("Invalid date format: {:?}", cell)),
     }
 }
 

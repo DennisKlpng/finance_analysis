@@ -1,6 +1,3 @@
-mod db;
-mod import;
-mod models;
 mod routes;
 
 use std::sync::{Arc, Mutex};
@@ -12,7 +9,7 @@ use axum::{
 use tower_http::cors::{Any, CorsLayer};
 use tracing::info;
 
-use db::Database;
+use finance_analysis::db::Database;
 use routes::*;
 
 const DB_PATH: &str = "Z:/Finanzen/finance.db";

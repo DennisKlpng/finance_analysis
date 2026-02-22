@@ -23,4 +23,3 @@ target
 # Personal data files
 excel_mapping.json
 *.db
-test/

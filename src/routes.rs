@@ -9,8 +9,8 @@ use axum::{
 };
 use serde_json::{json, Value};
 
-use crate::db::Database;
-use crate::models::{RegularEntry, SingularEntry};
+use finance_analysis::db::Database;
+use finance_analysis::models::{RegularEntry, SingularEntry};
 
 pub type AppState = Arc<Mutex<Database>>;
 
@@ -292,7 +292,7 @@ pub async fn import_excel(
 
     // Import
     let db_guard = db.lock().unwrap();
-    let result = crate::import::import_excel(&temp_path, "excel_mapping.json", &db_guard, year);
+    let result = finance_analysis::import::import_excel(&temp_path, "excel_mapping.json", &db_guard, year);
     drop(db_guard);
 
     // Clean up temp file

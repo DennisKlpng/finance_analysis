@@ -1,0 +1,41 @@
+{
+  "_comment": "Excel Import Mapping Configuration",
+  "_instructions": "Copy this file to 'excel_mapping.json' and fill in your actual category values from Excel",
+
+  "type_category_recurring": {
+	"Freizeit alleine": "Freizeit",
+	"Miete + Nebenkosten": "Miete"
+  },
+
+  "type_category_singular": {
+	"Freizeit alleine": "Freizeit",
+	"Mobilität – Tanken": "Mobilität"
+  },
+
+  "necessity_category": {
+    "Notwendig": "Notwendig",
+	"Nützlich": "Nützlich",
+    "Eher unwichtig": "Luxus",
+	"Luxus": "Luxus"
+
+  },
+
+  "_available_type_categories": [
+    "Lebensmittel&Haushaltsbedarf",
+    "Freizeit",
+    "Mobilität",
+    "Kleidung",
+    "Elektronik",
+    "Wohnungseinrichtung",
+    "Urlaub",
+    "Miete",
+    "Versicherungen",
+    "Sonstiges"
+  ],
+
+  "_available_necessity_categories": [
+    "Notwendig",
+    "Nützlich",
+    "Luxus"
+  ]
+}
