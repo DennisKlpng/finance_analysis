@@ -146,6 +146,30 @@
   .year-table td { text-align: right; }
   .year-table td:first-child { text-align: left; font-weight: 600; }
   .totals-row { border-top: 2px solid var(--border) !important; font-weight: 700; }
+
+  /* Wealth Components */
+  .component-row { display: flex; gap: 10px; margin-bottom: 8px; align-items: center; }
+  .component-row input[type="text"] { flex: 1; }
+  .component-row input[type="number"] { width: 180px; }
+  .component-row button { width: 32px; height: 32px; padding: 0; background: var(--surface2);
+                           border: 1px solid var(--border); border-radius: var(--radius);
+                           color: var(--text2); cursor: pointer; font-size: 18px; }
+  .component-row button:hover { background: var(--red); color: #fff; border-color: var(--red); }
+
+  .snapshot-item { background: var(--surface2); border: 1px solid var(--border);
+                    border-radius: var(--radius); padding: 12px; margin-bottom: 12px; }
+  .snapshot-header { display: flex; justify-content: space-between; align-items: center;
+                      cursor: pointer; }
+  .snapshot-header:hover { background: var(--surface); }
+  .snapshot-details { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border);
+                       display: none; }
+  .snapshot-details.show { display: block; }
+  .component-item { display: flex; justify-content: space-between; padding: 4px 0; }
+
+  .salary-section { margin-top: 48px; padding-top: 24px; border-top: 2px solid var(--border); }
+  .positive { color: var(--green); }
+  .negative { color: var(--red); }
+  .neutral { color: var(--text2); }
 </style>
 </head>
 <body>
@@ -153,7 +177,8 @@
 <header>
   <h1>Finance Analysis</h1>
   <nav>
-    <button class="active" onclick="showPage('year')">Year Overview</button>
+    <button class="active" onclick="showPage('wealth')">Wealth Overview</button>
+    <button onclick="showPage('year')">Finance Overview</button>
     <button onclick="showPage('dashboard')">Monthly</button>
     <button onclick="showPage('singular')">One-time</button>
     <button onclick="showPage('regular')">Recurring</button>
@@ -162,8 +187,141 @@
 </header>
 
 <main>
-  <!-- ── Year Overview ── -->
-  <section id="page-year" class="page active">
+  <!-- ── Wealth Overview ── -->
+  <section id="page-wealth" class="page active">
+    <h2>Wealth Development</h2>
+
+    <!-- Wealth Chart -->
+    <div class="card">
+      <canvas id="wealthChart" style="max-height: 400px;"></canvas>
+    </div>
+
+    <!-- Yearly Balance Table -->
+    <div class="card table-wrap" style="margin-top: 24px;">
+      <h3>Yearly Balance</h3>
+      <table id="yearly-balance-table">
+        <thead>
+          <tr>
+            <th>Year</th>
+            <th>Starting Wealth</th>
+            <th>Ending Wealth</th>
+            <th>Change</th>
+            <th>% Change</th>
+          </tr>
+        </thead>
+        <tbody id="yearly-balance-body">
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Wealth Snapshots Management -->
+    <div class="card" style="margin-top: 24px;">
+      <h3>Wealth Snapshots</h3>
+      <div id="wealth-snapshots-list"></div>
+
+      <h4 style="margin-top: 24px;">Add New Snapshot</h4>
+      <form id="wealth-snapshot-form" onsubmit="submitWealthSnapshot(event)">
+        <div class="form-row">
+          <label>Date: <input type="date" id="wealth-date" required /></label>
+        </div>
+        <div id="wealth-components">
+          <div class="component-row">
+            <input type="text" placeholder="Component name" required />
+            <input type="number" step="0.01" placeholder="Amount (€)" required onchange="updateWealthTotal()" />
+            <button type="button" onclick="removeComponent(this)">✕</button>
+          </div>
+        </div>
+        <button type="button" class="btn btn-ghost" onclick="addComponent()" style="margin-top: 8px;">+ Add Component</button>
+        <div style="margin-top: 12px;">
+          <strong>Total: <span id="wealth-total">0.00</span> €</strong>
+        </div>
+        <button type="submit" class="btn" style="margin-top: 12px;">Save Snapshot</button>
+      </form>
+    </div>
+
+    <!-- Salary Management -->
+    <div class="salary-section">
+      <h2>Salary Overview</h2>
+
+      <!-- Fixed Salary -->
+      <div class="card">
+        <h3>Fixed Salary History</h3>
+        <table id="fixed-salary-table">
+          <thead>
+            <tr>
+              <th>Effective Date</th>
+              <th>Monthly Salary</th>
+              <th>Payments/Year</th>
+              <th>Annual Salary</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="fixed-salary-body">
+          </tbody>
+        </table>
+
+        <h4 style="margin-top: 24px;">Add Fixed Salary</h4>
+        <form id="fixed-salary-form" onsubmit="submitFixedSalary(event)">
+          <div class="form-row">
+            <label>Effective Date: <input type="date" id="fixed-date" required /></label>
+            <label>Monthly Amount (€): <input type="number" step="0.01" id="fixed-monthly" required /></label>
+            <label>Payments/Year: <input type="number" id="fixed-payments" value="12" min="1" max="24" required /></label>
+          </div>
+          <button type="submit" class="btn">Add Fixed Salary</button>
+        </form>
+      </div>
+
+      <!-- Variable Salary -->
+      <div class="card" style="margin-top: 24px;">
+        <h3>Variable Salary</h3>
+        <table id="variable-salary-table">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Amount</th>
+              <th>Description</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="variable-salary-body">
+          </tbody>
+        </table>
+
+        <h4 style="margin-top: 24px;">Add Variable Salary</h4>
+        <form id="variable-salary-form" onsubmit="submitVariableSalary(event)">
+          <div class="form-row">
+            <label>Date: <input type="date" id="variable-date" required /></label>
+            <label>Amount (€): <input type="number" step="0.01" id="variable-amount" required /></label>
+            <label>Description: <input type="text" id="variable-desc" required /></label>
+          </div>
+          <button type="submit" class="btn">Add Variable Salary</button>
+        </form>
+      </div>
+
+      <!-- Salary Development Tables -->
+      <div class="card" style="margin-top: 24px;">
+        <h3>Salary Development Analysis</h3>
+
+        <h4>January 1st Snapshot & Changes</h4>
+        <table id="jan1-salary-table">
+          <thead>
+            <tr>
+              <th>Year</th>
+              <th>Effective Salary (Jan 1)</th>
+              <th>Change vs Prev Year</th>
+              <th>% Change vs Prev</th>
+              <th>Cumulative % Change</th>
+            </tr>
+          </thead>
+          <tbody id="jan1-salary-body">
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Finance Overview ── -->
+  <section id="page-year" class="page">
     <div class="year-nav">
       <button onclick="prevYear()">&#8249;</button>
       <span class="year-label" id="year-label">Loading…</span>
@@ -439,11 +597,415 @@ function showPage(name) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.getElementById('page-' + name).classList.add('active');
   document.querySelectorAll('nav button').forEach((b, i) => {
-    b.classList.toggle('active', ['year','dashboard','singular','regular'][i] === name);
+    b.classList.toggle('active', ['wealth','year','dashboard','singular','regular'][i] === name);
   });
+  if (name === 'wealth') loadWealthOverview();
   if (name === 'singular') loadSingular();
   if (name === 'regular') loadRegular();
   if (name === 'year') loadYearOverview();
+}
+
+// ─── Wealth Overview ─────────────────────────────────────────────────────────
+let wealthChart = null;
+let wealthSnapshots = [];
+let fixedSalaries = [];
+let variableSalaries = [];
+
+async function loadWealthOverview() {
+  await Promise.all([
+    loadWealthSnapshots(),
+    loadFixedSalaries(),
+    loadVariableSalaries()
+  ]);
+  renderWealthChart();
+  renderYearlyBalanceTable();
+  renderWealthSnapshotsList();
+  renderFixedSalaryTable();
+  renderVariableSalaryTable();
+  renderJan1Table();
+}
+
+async function loadWealthSnapshots() {
+  const res = await fetch('/api/wealth');
+  wealthSnapshots = await res.json();
+}
+
+async function loadFixedSalaries() {
+  const res = await fetch('/api/salary/fixed');
+  fixedSalaries = await res.json();
+}
+
+async function loadVariableSalaries() {
+  const res = await fetch('/api/salary/variable');
+  variableSalaries = await res.json();
+}
+
+function renderWealthChart() {
+  const ctx = document.getElementById('wealthChart');
+  if (!ctx) return;
+
+  if (wealthChart) wealthChart.destroy();
+
+  const sorted = [...wealthSnapshots].sort((a, b) => new Date(a.date) - new Date(b.date));
+  const labels = sorted.map(s => s.date);
+  const data = sorted.map(s => s.total);
+
+  wealthChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        label: 'Total Wealth (€)',
+        data,
+        borderColor: '#6366f1',
+        backgroundColor: 'rgba(99, 102, 241, 0.1)',
+        fill: true,
+        tension: 0.3
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false }
+      },
+      scales: {
+        y: {
+          beginAtZero: false,
+          ticks: { callback: v => v.toLocaleString('de-DE') + ' €' }
+        }
+      }
+    }
+  });
+}
+
+function renderYearlyBalanceTable() {
+  const tbody = document.getElementById('yearly-balance-body');
+  if (!tbody) return;
+
+  // Group snapshots by year
+  const byYear = {};
+  wealthSnapshots.forEach(s => {
+    const year = new Date(s.date).getFullYear();
+    if (!byYear[year]) byYear[year] = [];
+    byYear[year].push(s);
+  });
+
+  const years = Object.keys(byYear).sort();
+  const rows = [];
+
+  years.forEach((year, idx) => {
+    const yearInt = parseInt(year);
+    const nextYear = years[idx + 1] ? parseInt(years[idx + 1]) : null;
+
+    // First snapshot of current year
+    const currentYearSnapshots = byYear[year].sort((a, b) => new Date(a.date) - new Date(b.date));
+    const startWealth = currentYearSnapshots[0].total;
+
+    // First snapshot of next year, or last snapshot of current year
+    let endWealth;
+    if (nextYear && byYear[nextYear]) {
+      const nextYearSnapshots = byYear[nextYear].sort((a, b) => new Date(a.date) - new Date(b.date));
+      endWealth = nextYearSnapshots[0].total;
+    } else {
+      endWealth = currentYearSnapshots[currentYearSnapshots.length - 1].total;
+    }
+
+    const change = endWealth - startWealth;
+    const pctChange = startWealth !== 0 ? (change / startWealth * 100) : 0;
+
+    rows.push({ year: yearInt, startWealth, endWealth, change, pctChange });
+  });
+
+  tbody.innerHTML = rows.map(r => `
+    <tr>
+      <td>${r.year}</td>
+      <td>${r.startWealth.toLocaleString('de-DE', { minimumFractionDigits: 2 })} €</td>
+      <td>${r.endWealth.toLocaleString('de-DE', { minimumFractionDigits: 2 })} €</td>
+      <td class="${r.change >= 0 ? 'positive' : 'negative'}">
+        ${r.change >= 0 ? '+' : ''}${r.change.toLocaleString('de-DE', { minimumFractionDigits: 2 })} €
+      </td>
+      <td class="${r.pctChange >= 0 ? 'positive' : 'negative'}">
+        ${r.pctChange >= 0 ? '+' : ''}${r.pctChange.toFixed(2)}%
+      </td>
+    </tr>
+  `).join('');
+}
+
+function renderWealthSnapshotsList() {
+  const container = document.getElementById('wealth-snapshots-list');
+  if (!container) return;
+
+  const sorted = [...wealthSnapshots].sort((a, b) => new Date(b.date) - new Date(a.date));
+
+  container.innerHTML = sorted.map((s, idx) => `
+    <div class="snapshot-item">
+      <div class="snapshot-header" onclick="toggleSnapshot(${idx})">
+        <div>
+          <strong>${s.date}</strong> —
+          <span>${s.total.toLocaleString('de-DE', { minimumFractionDigits: 2 })} €</span>
+        </div>
+        <button type="button" class="btn btn-ghost" onclick="event.stopPropagation(); deleteWealthSnapshot('${s.date}')">Delete</button>
+      </div>
+      <div class="snapshot-details" id="snapshot-details-${idx}">
+        ${s.components.map(c => `
+          <div class="component-item">
+            <span>${c.name}</span>
+            <span>${c.amount.toLocaleString('de-DE', { minimumFractionDigits: 2 })} €</span>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `).join('');
+}
+
+function toggleSnapshot(idx) {
+  const details = document.getElementById(`snapshot-details-${idx}`);
+  if (details) details.classList.toggle('show');
+}
+
+// Component management
+function addComponent() {
+  const container = document.getElementById('wealth-components');
+  const row = document.createElement('div');
+  row.className = 'component-row';
+  row.innerHTML = `
+    <input type="text" placeholder="Component name" required />
+    <input type="number" step="0.01" placeholder="Amount (€)" required onchange="updateWealthTotal()" />
+    <button type="button" onclick="removeComponent(this)">✕</button>
+  `;
+  container.appendChild(row);
+}
+
+function removeComponent(btn) {
+  const rows = document.querySelectorAll('#wealth-components .component-row');
+  if (rows.length > 1) {
+    btn.parentElement.remove();
+    updateWealthTotal();
+  }
+}
+
+function updateWealthTotal() {
+  const rows = document.querySelectorAll('#wealth-components .component-row');
+  let total = 0;
+  rows.forEach(row => {
+    const amount = parseFloat(row.querySelector('input[type="number"]').value) || 0;
+    total += amount;
+  });
+  document.getElementById('wealth-total').textContent = total.toLocaleString('de-DE', { minimumFractionDigits: 2 });
+}
+
+async function submitWealthSnapshot(e) {
+  e.preventDefault();
+  const date = document.getElementById('wealth-date').value;
+  const rows = document.querySelectorAll('#wealth-components .component-row');
+
+  const components = Array.from(rows).map(row => ({
+    name: row.querySelector('input[type="text"]').value,
+    amount: parseFloat(row.querySelector('input[type="number"]').value)
+  }));
+
+  const total = components.reduce((sum, c) => sum + c.amount, 0);
+
+  try {
+    const res = await fetch('/api/wealth', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ date, components, total })
+    });
+
+    if (!res.ok) {
+      const error = await res.json();
+      alert('Error: ' + error.error);
+      return;
+    }
+
+    document.getElementById('wealth-snapshot-form').reset();
+    document.getElementById('wealth-components').innerHTML = `
+      <div class="component-row">
+        <input type="text" placeholder="Component name" required />
+        <input type="number" step="0.01" placeholder="Amount (€)" required onchange="updateWealthTotal()" />
+        <button type="button" onclick="removeComponent(this)">✕</button>
+      </div>
+    `;
+    updateWealthTotal();
+    await loadWealthOverview();
+  } catch (err) {
+    alert('Error saving snapshot: ' + err.message);
+  }
+}
+
+async function deleteWealthSnapshot(date) {
+  if (!confirm(`Delete snapshot from ${date}?`)) return;
+
+  try {
+    await fetch(`/api/wealth/${date}`, { method: 'DELETE' });
+    await loadWealthOverview();
+  } catch (err) {
+    alert('Error deleting snapshot: ' + err.message);
+  }
+}
+
+// Fixed Salary
+function renderFixedSalaryTable() {
+  const tbody = document.getElementById('fixed-salary-body');
+  if (!tbody) return;
+
+  const sorted = [...fixedSalaries].sort((a, b) => new Date(a.effective_date) - new Date(b.effective_date));
+
+  tbody.innerHTML = sorted.map(s => `
+    <tr>
+      <td>${s.effective_date}</td>
+      <td>${s.monthly_amount.toLocaleString('de-DE', { minimumFractionDigits: 2 })} €</td>
+      <td>${s.payments_per_year}</td>
+      <td>${(s.monthly_amount * s.payments_per_year).toLocaleString('de-DE', { minimumFractionDigits: 2 })} €</td>
+      <td>
+        <button class="btn btn-ghost" onclick="deleteFixedSalary(${s.id})">Delete</button>
+      </td>
+    </tr>
+  `).join('');
+}
+
+async function submitFixedSalary(e) {
+  e.preventDefault();
+  const effective_date = document.getElementById('fixed-date').value;
+  const monthly_amount = parseFloat(document.getElementById('fixed-monthly').value);
+  const payments_per_year = parseInt(document.getElementById('fixed-payments').value);
+
+  try {
+    await fetch('/api/salary/fixed', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ effective_date, monthly_amount, payments_per_year })
+    });
+
+    document.getElementById('fixed-salary-form').reset();
+    document.getElementById('fixed-payments').value = '12';
+    await loadWealthOverview();
+  } catch (err) {
+    alert('Error saving fixed salary: ' + err.message);
+  }
+}
+
+async function deleteFixedSalary(id) {
+  if (!confirm('Delete this salary entry?')) return;
+
+  try {
+    await fetch(`/api/salary/fixed/${id}`, { method: 'DELETE' });
+    await loadWealthOverview();
+  } catch (err) {
+    alert('Error deleting salary: ' + err.message);
+  }
+}
+
+// Variable Salary
+function renderVariableSalaryTable() {
+  const tbody = document.getElementById('variable-salary-body');
+  if (!tbody) return;
+
+  const sorted = [...variableSalaries].sort((a, b) => new Date(b.date) - new Date(a.date));
+
+  tbody.innerHTML = sorted.map(s => `
+    <tr>
+      <td>${s.date}</td>
+      <td>${s.amount.toLocaleString('de-DE', { minimumFractionDigits: 2 })} €</td>
+      <td>${s.description}</td>
+      <td>
+        <button class="btn btn-ghost" onclick="deleteVariableSalary(${s.id})">Delete</button>
+      </td>
+    </tr>
+  `).join('');
+}
+
+async function submitVariableSalary(e) {
+  e.preventDefault();
+  const date = document.getElementById('variable-date').value;
+  const amount = parseFloat(document.getElementById('variable-amount').value);
+  const description = document.getElementById('variable-desc').value;
+
+  try {
+    await fetch('/api/salary/variable', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ date, amount, description })
+    });
+
+    document.getElementById('variable-salary-form').reset();
+    await loadWealthOverview();
+  } catch (err) {
+    alert('Error saving variable salary: ' + err.message);
+  }
+}
+
+async function deleteVariableSalary(id) {
+  if (!confirm('Delete this salary entry?')) return;
+
+  try {
+    await fetch(`/api/salary/variable/${id}`, { method: 'DELETE' });
+    await loadWealthOverview();
+  } catch (err) {
+    alert('Error deleting salary: ' + err.message);
+  }
+}
+
+// Jan 1st Salary Analysis
+function renderJan1Table() {
+  const tbody = document.getElementById('jan1-salary-body');
+  if (!tbody) return;
+
+  if (fixedSalaries.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;">No salary data</td></tr>';
+    return;
+  }
+
+  // Get all unique years from salary data
+  const sorted = [...fixedSalaries].sort((a, b) => new Date(a.effective_date) - new Date(b.effective_date));
+  const firstYear = new Date(sorted[0].effective_date).getFullYear();
+  const lastYear = new Date(sorted[sorted.length - 1].effective_date).getFullYear();
+
+  const rows = [];
+  for (let year = firstYear; year <= lastYear; year++) {
+    const jan1 = `${year}-01-01`;
+
+    // Find salary effective on Jan 1
+    let effectiveSalary = null;
+    for (let i = sorted.length - 1; i >= 0; i--) {
+      if (sorted[i].effective_date <= jan1) {
+        effectiveSalary = sorted[i];
+        break;
+      }
+    }
+
+    if (effectiveSalary) {
+      const annual = effectiveSalary.monthly_amount * effectiveSalary.payments_per_year;
+      rows.push({ year, salary: effectiveSalary, annual });
+    }
+  }
+
+  const firstAnnual = rows[0]?.annual || 0;
+
+  tbody.innerHTML = rows.map((r, idx) => {
+    const prevAnnual = idx > 0 ? rows[idx - 1].annual : null;
+    const change = prevAnnual ? r.annual - prevAnnual : null;
+    const pctChange = prevAnnual ? (change / prevAnnual * 100) : null;
+    const cumulativePct = firstAnnual ? ((r.annual - firstAnnual) / firstAnnual * 100) : 0;
+
+    return `
+      <tr>
+        <td>${r.year}</td>
+        <td>${r.annual.toLocaleString('de-DE', { minimumFractionDigits: 2 })} €</td>
+        <td class="${change === null ? 'neutral' : (change >= 0 ? 'positive' : 'negative')}">
+          ${change === null ? '—' : (change >= 0 ? '+' : '') + change.toLocaleString('de-DE', { minimumFractionDigits: 2 }) + ' €'}
+        </td>
+        <td class="${pctChange === null ? 'neutral' : (pctChange >= 0 ? 'positive' : 'negative')}">
+          ${pctChange === null ? '—' : (pctChange >= 0 ? '+' : '') + pctChange.toFixed(2) + '%'}
+        </td>
+        <td class="${cumulativePct >= 0 ? 'positive' : 'negative'}">
+          ${cumulativePct >= 0 ? '+' : ''}${cumulativePct.toFixed(2)}%
+        </td>
+      </tr>
+    `;
+  }).join('');
 }
 
 // ─── Year Overview ───────────────────────────────────────────────────────────

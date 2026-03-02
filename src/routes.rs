@@ -315,3 +315,204 @@ pub async fn import_excel(
             .into_response(),
     }
 }
+
+// ─── Wealth Snapshots ─────────────────────────────────────────────────────────
+
+pub async fn list_wealth_snapshots(State(db): State<AppState>) -> Response {
+    let db = db.lock().unwrap();
+    match db.get_all_wealth_snapshots() {
+        Ok(snapshots) => Json(snapshots).into_response(),
+        Err(e) => db_err(e),
+    }
+}
+
+pub async fn create_wealth_snapshot(
+    State(db): State<AppState>,
+    Json(snapshot): Json<finance_analysis::models::WealthSnapshot>,
+) -> Response {
+    let db = db.lock().unwrap();
+    match db.add_wealth_snapshot(&snapshot) {
+        Ok(id) => (StatusCode::CREATED, Json(json!({ "id": id }))).into_response(),
+        Err(e) => db_err(e),
+    }
+}
+
+pub async fn get_wealth_snapshot_by_date(
+    State(db): State<AppState>,
+    Path(date_str): Path<String>,
+) -> Response {
+    let date = match chrono::NaiveDate::parse_from_str(&date_str, "%Y-%m-%d") {
+        Ok(d) => d,
+        Err(_) => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(json!({ "error": "Invalid date format, use YYYY-MM-DD" })),
+            )
+                .into_response()
+        }
+    };
+
+    let db = db.lock().unwrap();
+    match db.get_wealth_snapshot(&date) {
+        Ok(Some(snapshot)) => Json(snapshot).into_response(),
+        Ok(None) => not_found(),
+        Err(e) => db_err(e),
+    }
+}
+
+pub async fn update_wealth_snapshot(
+    State(db): State<AppState>,
+    Path(date_str): Path<String>,
+    Json(mut snapshot): Json<finance_analysis::models::WealthSnapshot>,
+) -> Response {
+    let date = match chrono::NaiveDate::parse_from_str(&date_str, "%Y-%m-%d") {
+        Ok(d) => d,
+        Err(_) => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(json!({ "error": "Invalid date format, use YYYY-MM-DD" })),
+            )
+                .into_response()
+        }
+    };
+
+    // Get existing snapshot to obtain ID
+    let db = db.lock().unwrap();
+    let existing = match db.get_wealth_snapshot(&date) {
+        Ok(Some(s)) => s,
+        Ok(None) => return not_found(),
+        Err(e) => return db_err(e),
+    };
+
+    snapshot.id = existing.id;
+    snapshot.date = date;
+
+    match db.update_wealth_snapshot(&snapshot) {
+        Ok(_) => Json(json!({ "ok": true })).into_response(),
+        Err(e) => db_err(e),
+    }
+}
+
+pub async fn delete_wealth_snapshot(
+    State(db): State<AppState>,
+    Path(date_str): Path<String>,
+) -> Response {
+    let date = match chrono::NaiveDate::parse_from_str(&date_str, "%Y-%m-%d") {
+        Ok(d) => d,
+        Err(_) => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(json!({ "error": "Invalid date format, use YYYY-MM-DD" })),
+            )
+                .into_response()
+        }
+    };
+
+    let db = db.lock().unwrap();
+    match db.delete_wealth_snapshot(&date) {
+        Ok(_) => Json(json!({ "ok": true })).into_response(),
+        Err(e) => db_err(e),
+    }
+}
+
+// ─── Fixed Salary ─────────────────────────────────────────────────────────────
+
+pub async fn list_fixed_salaries(State(db): State<AppState>) -> Response {
+    let db = db.lock().unwrap();
+    match db.get_all_fixed_salaries() {
+        Ok(salaries) => Json(salaries).into_response(),
+        Err(e) => db_err(e),
+    }
+}
+
+pub async fn create_fixed_salary(
+    State(db): State<AppState>,
+    Json(salary): Json<finance_analysis::models::FixedSalary>,
+) -> Response {
+    let db = db.lock().unwrap();
+    match db.add_fixed_salary(&salary) {
+        Ok(id) => (StatusCode::CREATED, Json(json!({ "id": id }))).into_response(),
+        Err(e) => db_err(e),
+    }
+}
+
+pub async fn get_fixed_salary(State(db): State<AppState>, Path(id): Path<i64>) -> Response {
+    let db = db.lock().unwrap();
+    match db.get_fixed_salary(id) {
+        Ok(Some(salary)) => Json(salary).into_response(),
+        Ok(None) => not_found(),
+        Err(e) => db_err(e),
+    }
+}
+
+pub async fn update_fixed_salary(
+    State(db): State<AppState>,
+    Path(id): Path<i64>,
+    Json(mut salary): Json<finance_analysis::models::FixedSalary>,
+) -> Response {
+    salary.id = Some(id);
+    let db = db.lock().unwrap();
+    match db.update_fixed_salary(&salary) {
+        Ok(_) => Json(json!({ "ok": true })).into_response(),
+        Err(e) => db_err(e),
+    }
+}
+
+pub async fn delete_fixed_salary(State(db): State<AppState>, Path(id): Path<i64>) -> Response {
+    let db = db.lock().unwrap();
+    match db.delete_fixed_salary(id) {
+        Ok(_) => Json(json!({ "ok": true })).into_response(),
+        Err(e) => db_err(e),
+    }
+}
+
+// ─── Variable Salary ──────────────────────────────────────────────────────────
+
+pub async fn list_variable_salaries(State(db): State<AppState>) -> Response {
+    let db = db.lock().unwrap();
+    match db.get_all_variable_salaries() {
+        Ok(salaries) => Json(salaries).into_response(),
+        Err(e) => db_err(e),
+    }
+}
+
+pub async fn create_variable_salary(
+    State(db): State<AppState>,
+    Json(salary): Json<finance_analysis::models::VariableSalary>,
+) -> Response {
+    let db = db.lock().unwrap();
+    match db.add_variable_salary(&salary) {
+        Ok(id) => (StatusCode::CREATED, Json(json!({ "id": id }))).into_response(),
+        Err(e) => db_err(e),
+    }
+}
+
+pub async fn get_variable_salary(State(db): State<AppState>, Path(id): Path<i64>) -> Response {
+    let db = db.lock().unwrap();
+    match db.get_variable_salary(id) {
+        Ok(Some(salary)) => Json(salary).into_response(),
+        Ok(None) => not_found(),
+        Err(e) => db_err(e),
+    }
+}
+
+pub async fn update_variable_salary(
+    State(db): State<AppState>,
+    Path(id): Path<i64>,
+    Json(mut salary): Json<finance_analysis::models::VariableSalary>,
+) -> Response {
+    salary.id = Some(id);
+    let db = db.lock().unwrap();
+    match db.update_variable_salary(&salary) {
+        Ok(_) => Json(json!({ "ok": true })).into_response(),
+        Err(e) => db_err(e),
+    }
+}
+
+pub async fn delete_variable_salary(State(db): State<AppState>, Path(id): Path<i64>) -> Response {
+    let db = db.lock().unwrap();
+    match db.delete_variable_salary(id) {
+        Ok(_) => Json(json!({ "ok": true })).into_response(),
+        Err(e) => db_err(e),
+    }
+}

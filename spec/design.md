@@ -146,7 +146,140 @@ if is_new {
 }
 ```
 
-### 4. Excel/ODS Import Design
+### 4. Wealth and Salary Tracking Design
+
+#### 4.1 Flexible Wealth Components
+**Decision**: Store wealth components in separate table with flexible user-defined names.
+
+**Reasoning**:
+- Wealth composition changes over time (new accounts, investments, assets)
+- Different users have different tracking needs
+- No predefined categories needed
+- Supports both assets (positive) and liabilities (negative amounts)
+- Easy to add/remove/rename components
+
+**Data Model**:
+```rust
+pub struct WealthSnapshot {
+    id: Option<i64>,
+    date: NaiveDate,
+    components: Vec<WealthComponent>,
+    total: f64, // calculated
+}
+
+pub struct WealthComponent {
+    id: Option<i64>,
+    snapshot_id: Option<i64>,
+    name: String,        // user-defined
+    amount: f64,         // can be negative
+}
+```
+
+**Trade-offs**:
+- More flexible but less structured than predefined categories
+- Requires normalization (separate table) but improves queryability
+- Total must be calculated but ensures consistency
+
+#### 4.2 Salary Separation: Fixed vs Variable
+**Decision**: Separate tables for fixed salary (base salary) and variable salary (bonuses).
+
+**Reasoning**:
+- Fixed salary changes infrequently and has ongoing effect
+- Variable salary is one-time and unpredictable
+- Different calculation logic for each
+- Clearer data model and queries
+- Annual salary calculation simplified
+
+**Data Model**:
+```rust
+pub struct FixedSalary {
+    effective_date: NaiveDate,  // when it takes effect
+    monthly_amount: f64,
+    payments_per_year: u32,     // 12, 13, 14, etc.
+}
+
+pub struct VariableSalary {
+    date: NaiveDate,            // one-time payment date
+    amount: f64,
+    description: String,
+}
+```
+
+**Calculation Logic**:
+- Annual salary = monthly_amount × payments_per_year
+- For Jan 1 snapshot: find most recent fixed salary with effective_date <= Jan 1
+- No attempt to allocate 13th/14th salary to specific years (timing unknown)
+
+**Alternative Considered**: Single salary table with "type" field
+- Rejected: Different fields needed (payments_per_year not relevant for variable)
+- Rejected: Different query patterns (find effective vs list all)
+
+#### 4.3 Wealth Overview as Primary Tab
+**Decision**: Make Wealth Overview the first tab, replacing Year Overview as default.
+
+**Reasoning**:
+- Wealth tracking is long-term, higher-level view
+- Users want to see overall financial health first
+- Income/expense details are supporting information
+- Natural information hierarchy: wealth → income/expenses → transactions
+- Matches typical financial planning workflow
+
+**Navigation Order**:
+1. Wealth Overview (primary: wealth + salary)
+2. Finance Overview (renamed from Year Overview: income/expenses)
+3. Monthly (detailed monthly view)
+4. One-time (transaction level)
+5. Recurring (transaction level)
+
+#### 4.4 Line Chart for Wealth Development
+**Decision**: Use line chart (not bar or area) for wealth over time.
+
+**Reasoning**:
+- Wealth snapshots are point-in-time measurements
+- Line chart shows trends between snapshots
+- Fill under line gives visual weight
+- Chart.js provides good interaction (hover, zoom)
+- Consistent with financial industry conventions
+
+**Implementation**:
+```javascript
+new Chart(ctx, {
+  type: 'line',
+  data: {
+    labels: dates,
+    datasets: [{
+      data: totals,
+      fill: true,          // subtle fill under line
+      tension: 0.3         // smooth curves between points
+    }]
+  }
+})
+```
+
+#### 4.5 Calculation: January 1st Salary Snapshot
+**Decision**: Show salary state on January 1st of each year, not average or year-end.
+
+**Reasoning**:
+- Clear, unambiguous date for comparison
+- Represents "salary entering the year"
+- Natural for year-over-year comparisons
+- Aligns with typical salary negotiation timing
+- Avoids complex averaging when salary changes mid-year
+
+**Calculation**:
+```javascript
+// For each year with salary data:
+jan1Date = `${year}-01-01`
+effectiveSalary = findMostRecent(fixedSalaries, jan1Date)
+annualSalary = effectiveSalary.monthly * effectiveSalary.paymentsPerYear
+```
+
+**Trade-offs**:
+- Ignores mid-year changes in annual view
+- Clear and simple vs complete accuracy
+- Fixed salary table shows ALL changes for complete picture
+
+### 5. Excel/ODS Import Design
 
 #### 4.1 Marker-Based Section Detection
 **Decision**: Use marker text rows ("Variable Kosten", "Variable Einnahmen") to separate regular from singular entries.
@@ -266,6 +399,24 @@ GET  /api/months                      - Available months
 GET  /api/expenses/distribution/:year/:month - Expense distribution
 
 POST /api/import/excel      - Import Excel/ODS file
+
+GET  /api/wealth            - List all wealth snapshots
+POST /api/wealth            - Create wealth snapshot
+GET  /api/wealth/:date      - Get wealth snapshot by date
+PUT  /api/wealth/:date      - Update wealth snapshot
+DELETE /api/wealth/:date    - Delete wealth snapshot
+
+GET  /api/salary/fixed      - List fixed salary entries
+POST /api/salary/fixed      - Create fixed salary entry
+GET  /api/salary/fixed/:id  - Get/update/delete fixed salary entry
+PUT  /api/salary/fixed/:id
+DELETE /api/salary/fixed/:id
+
+GET  /api/salary/variable   - List variable salary entries
+POST /api/salary/variable   - Create variable salary entry
+GET  /api/salary/variable/:id - Get/update/delete variable salary entry
+PUT  /api/salary/variable/:id
+DELETE /api/salary/variable/:id
 ```
 
 #### 5.2 Shared Application State
@@ -424,25 +575,61 @@ path = "src/main.rs"
 
 **Reasoning**: Each dependency solves a specific problem with minimal overlap.
 
+## Recent Enhancements (March 2026)
+
+### Wealth and Salary Tracking
+Complete wealth and salary tracking system added:
+
+**Wealth Tracking**:
+- Flexible component-based wealth snapshots
+- Wealth development line chart
+- Yearly balance calculations with % changes
+- Support for assets and liabilities (positive/negative amounts)
+- Dynamic component management (add/remove fields)
+
+**Salary Tracking**:
+- Fixed salary history with effective dates
+- Variable salary entries (bonuses, commissions)
+- January 1st salary snapshots with year-over-year analysis
+- Percentage change calculations (vs previous year and cumulative)
+- Support for varying payment schedules (12-14 payments/year)
+
+**UI Changes**:
+- New "Wealth Overview" tab as primary landing page
+- Renamed "Year Overview" to "Finance Overview"
+- Line chart visualization for wealth trends
+- Color-coded positive/negative indicators
+- German locale formatting throughout
+
+**Technical**:
+- 4 new database tables
+- 12 new API endpoints
+- ~650 lines of frontend code
+- Comprehensive error handling
+
 ## Future Considerations
 
 ### Potential Enhancements
-1. **Export functionality**: Export data back to Excel/ODS
+1. **Export functionality**: Export wealth/salary data to Excel/CSV
 2. **Budgeting**: Set and track budget limits per category
-3. **Trends**: Visualize spending trends over time
-4. **Search**: Filter entries by date range, category, description
+3. **Wealth goals**: Set target wealth levels with progress tracking
+4. **Investment tracking**: More detailed breakdown of investment components
 5. **Backup**: Automated database backup functionality
-6. **Multi-year**: Compare year-over-year statistics
+6. **Wealth projections**: Forecast future wealth based on trends
+7. **Interactive charts**: Drill-down capability, date range filters
+8. **Salary projections**: Estimate future earnings with raises/bonuses
 
 ### Known Limitations
 1. No undo functionality (rely on database backups)
 2. No authentication (local-only, single-user assumption)
-3. Limited visualization options (only pie charts currently)
-4. No export to other formats (PDF, CSV)
-5. Manual category mapping setup required for imports
+3. No export to other formats (PDF, Excel)
+4. Manual category mapping setup required for Excel imports
+5. Wealth component names not validated (free text)
+6. No allocation of 13th/14th salary to specific months (timing unknown)
 
 ### Technical Debt
 1. Header row detection is naive (assumes Row 1)
 2. Could add connection pooling for better concurrency
 3. Frontend could be modularized for better organization
 4. More comprehensive error messages for import failures
+5. Duplicate date checking happens at database level (could be frontend validation)

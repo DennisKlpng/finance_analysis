@@ -44,6 +44,33 @@ impl Database {
                 necessity_category TEXT NOT NULL,
                 is_income INTEGER NOT NULL
             );
+
+            CREATE TABLE IF NOT EXISTS wealth_snapshots (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                date TEXT NOT NULL UNIQUE
+            );
+
+            CREATE TABLE IF NOT EXISTS wealth_components (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                snapshot_id INTEGER NOT NULL,
+                name TEXT NOT NULL,
+                amount REAL NOT NULL,
+                FOREIGN KEY (snapshot_id) REFERENCES wealth_snapshots(id) ON DELETE CASCADE
+            );
+
+            CREATE TABLE IF NOT EXISTS fixed_salary (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                effective_date TEXT NOT NULL,
+                monthly_amount REAL NOT NULL,
+                payments_per_year INTEGER NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS variable_salary (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                date TEXT NOT NULL,
+                amount REAL NOT NULL,
+                description TEXT NOT NULL
+            );
         ",
         )?;
         Ok(())
@@ -347,6 +374,239 @@ impl Database {
         let necessity_vec: Vec<(String, f64)> = necessity_dist.into_iter().collect();
 
         Ok((type_vec, necessity_vec))
+    }
+
+    // ─── Wealth Snapshots ─────────────────────────────────────────────────────
+
+    pub fn add_wealth_snapshot(&self, snapshot: &WealthSnapshot) -> Result<i64> {
+        // Insert snapshot
+        self.conn.execute(
+            "INSERT INTO wealth_snapshots (date) VALUES (?1)",
+            params![snapshot.date.to_string()],
+        )?;
+        let snapshot_id = self.conn.last_insert_rowid();
+
+        // Insert components
+        for component in &snapshot.components {
+            self.conn.execute(
+                "INSERT INTO wealth_components (snapshot_id, name, amount) VALUES (?1, ?2, ?3)",
+                params![snapshot_id, component.name, component.amount],
+            )?;
+        }
+
+        Ok(snapshot_id)
+    }
+
+    pub fn get_all_wealth_snapshots(&self) -> Result<Vec<WealthSnapshot>> {
+        let mut snapshots = Vec::new();
+        let mut stmt = self.conn.prepare(
+            "SELECT id, date FROM wealth_snapshots ORDER BY date ASC"
+        )?;
+        let rows = stmt.query_map([], |row| {
+            Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?))
+        })?;
+
+        for row in rows {
+            let (id, date_str) = row?;
+            let components = self.get_wealth_components(id)?;
+            let total: f64 = components.iter().map(|c| c.amount).sum();
+            snapshots.push(WealthSnapshot {
+                id: Some(id),
+                date: NaiveDate::parse_from_str(&date_str, "%Y-%m-%d")
+                    .expect("Invalid date in DB"),
+                components,
+                total,
+            });
+        }
+
+        Ok(snapshots)
+    }
+
+    pub fn get_wealth_snapshot(&self, date: &NaiveDate) -> Result<Option<WealthSnapshot>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT id FROM wealth_snapshots WHERE date = ?1"
+        )?;
+        let id: Option<i64> = stmt.query_row(params![date.to_string()], |row| row.get(0)).ok();
+
+        match id {
+            Some(id) => {
+                let components = self.get_wealth_components(id)?;
+                let total: f64 = components.iter().map(|c| c.amount).sum();
+                Ok(Some(WealthSnapshot {
+                    id: Some(id),
+                    date: *date,
+                    components,
+                    total,
+                }))
+            }
+            None => Ok(None),
+        }
+    }
+
+    fn get_wealth_components(&self, snapshot_id: i64) -> Result<Vec<WealthComponent>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT id, name, amount FROM wealth_components WHERE snapshot_id = ?1"
+        )?;
+        let rows = stmt.query_map(params![snapshot_id], |row| {
+            Ok(WealthComponent {
+                id: Some(row.get(0)?),
+                snapshot_id: Some(snapshot_id),
+                name: row.get(1)?,
+                amount: row.get(2)?,
+            })
+        })?;
+
+        rows.collect()
+    }
+
+    pub fn update_wealth_snapshot(&self, snapshot: &WealthSnapshot) -> Result<()> {
+        let id = snapshot.id.expect("Snapshot must have ID for update");
+
+        // Delete existing components
+        self.conn.execute(
+            "DELETE FROM wealth_components WHERE snapshot_id = ?1",
+            params![id],
+        )?;
+
+        // Insert new components
+        for component in &snapshot.components {
+            self.conn.execute(
+                "INSERT INTO wealth_components (snapshot_id, name, amount) VALUES (?1, ?2, ?3)",
+                params![id, component.name, component.amount],
+            )?;
+        }
+
+        Ok(())
+    }
+
+    pub fn delete_wealth_snapshot(&self, date: &NaiveDate) -> Result<()> {
+        self.conn.execute(
+            "DELETE FROM wealth_snapshots WHERE date = ?1",
+            params![date.to_string()],
+        )?;
+        Ok(())
+    }
+
+    // ─── Fixed Salary ─────────────────────────────────────────────────────────
+
+    pub fn add_fixed_salary(&self, salary: &FixedSalary) -> Result<i64> {
+        self.conn.execute(
+            "INSERT INTO fixed_salary (effective_date, monthly_amount, payments_per_year) VALUES (?1, ?2, ?3)",
+            params![salary.effective_date.to_string(), salary.monthly_amount, salary.payments_per_year],
+        )?;
+        Ok(self.conn.last_insert_rowid())
+    }
+
+    pub fn get_all_fixed_salaries(&self) -> Result<Vec<FixedSalary>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT id, effective_date, monthly_amount, payments_per_year FROM fixed_salary ORDER BY effective_date ASC"
+        )?;
+        let rows = stmt.query_map([], |row| {
+            let date_str: String = row.get(1)?;
+            Ok(FixedSalary {
+                id: Some(row.get(0)?),
+                effective_date: NaiveDate::parse_from_str(&date_str, "%Y-%m-%d")
+                    .expect("Invalid date in DB"),
+                monthly_amount: row.get(2)?,
+                payments_per_year: row.get(3)?,
+            })
+        })?;
+
+        rows.collect()
+    }
+
+    pub fn get_fixed_salary(&self, id: i64) -> Result<Option<FixedSalary>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT id, effective_date, monthly_amount, payments_per_year FROM fixed_salary WHERE id = ?1"
+        )?;
+        match stmt.query_row(params![id], |row| {
+            let date_str: String = row.get(1)?;
+            Ok(FixedSalary {
+                id: Some(row.get(0)?),
+                effective_date: NaiveDate::parse_from_str(&date_str, "%Y-%m-%d")
+                    .expect("Invalid date in DB"),
+                monthly_amount: row.get(2)?,
+                payments_per_year: row.get(3)?,
+            })
+        }) {
+            Ok(salary) => Ok(Some(salary)),
+            Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+            Err(e) => Err(e),
+        }
+    }
+
+    pub fn update_fixed_salary(&self, salary: &FixedSalary) -> Result<()> {
+        self.conn.execute(
+            "UPDATE fixed_salary SET effective_date = ?1, monthly_amount = ?2, payments_per_year = ?3 WHERE id = ?4",
+            params![salary.effective_date.to_string(), salary.monthly_amount, salary.payments_per_year, salary.id],
+        )?;
+        Ok(())
+    }
+
+    pub fn delete_fixed_salary(&self, id: i64) -> Result<()> {
+        self.conn.execute("DELETE FROM fixed_salary WHERE id = ?1", params![id])?;
+        Ok(())
+    }
+
+    // ─── Variable Salary ──────────────────────────────────────────────────────
+
+    pub fn add_variable_salary(&self, salary: &VariableSalary) -> Result<i64> {
+        self.conn.execute(
+            "INSERT INTO variable_salary (date, amount, description) VALUES (?1, ?2, ?3)",
+            params![salary.date.to_string(), salary.amount, salary.description],
+        )?;
+        Ok(self.conn.last_insert_rowid())
+    }
+
+    pub fn get_all_variable_salaries(&self) -> Result<Vec<VariableSalary>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT id, date, amount, description FROM variable_salary ORDER BY date ASC"
+        )?;
+        let rows = stmt.query_map([], |row| {
+            let date_str: String = row.get(1)?;
+            Ok(VariableSalary {
+                id: Some(row.get(0)?),
+                date: NaiveDate::parse_from_str(&date_str, "%Y-%m-%d")
+                    .expect("Invalid date in DB"),
+                amount: row.get(2)?,
+                description: row.get(3)?,
+            })
+        })?;
+
+        rows.collect()
+    }
+
+    pub fn get_variable_salary(&self, id: i64) -> Result<Option<VariableSalary>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT id, date, amount, description FROM variable_salary WHERE id = ?1"
+        )?;
+        match stmt.query_row(params![id], |row| {
+            let date_str: String = row.get(1)?;
+            Ok(VariableSalary {
+                id: Some(row.get(0)?),
+                date: NaiveDate::parse_from_str(&date_str, "%Y-%m-%d")
+                    .expect("Invalid date in DB"),
+                amount: row.get(2)?,
+                description: row.get(3)?,
+            })
+        }) {
+            Ok(salary) => Ok(Some(salary)),
+            Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+            Err(e) => Err(e),
+        }
+    }
+
+    pub fn update_variable_salary(&self, salary: &VariableSalary) -> Result<()> {
+        self.conn.execute(
+            "UPDATE variable_salary SET date = ?1, amount = ?2, description = ?3 WHERE id = ?4",
+            params![salary.date.to_string(), salary.amount, salary.description, salary.id],
+        )?;
+        Ok(())
+    }
+
+    pub fn delete_variable_salary(&self, id: i64) -> Result<()> {
+        self.conn.execute("DELETE FROM variable_salary WHERE id = ?1", params![id])?;
+        Ok(())
     }
 }
 

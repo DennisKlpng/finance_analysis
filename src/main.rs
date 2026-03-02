@@ -3,7 +3,7 @@ mod routes;
 use std::sync::{Arc, Mutex};
 
 use axum::{
-    routing::{get, post},
+    routing::{delete, get, post, put},
     Router,
 };
 use tower_http::cors::{Any, CorsLayer};
@@ -54,6 +54,30 @@ async fn main() -> anyhow::Result<()> {
         .route("/api/expenses/distribution/:year/:month", get(expense_distribution))
         // Excel import
         .route("/api/import/excel", post(import_excel))
+        // Wealth snapshots
+        .route("/api/wealth", get(list_wealth_snapshots).post(create_wealth_snapshot))
+        .route(
+            "/api/wealth/:date",
+            get(get_wealth_snapshot_by_date)
+                .put(update_wealth_snapshot)
+                .delete(delete_wealth_snapshot),
+        )
+        // Fixed salary
+        .route("/api/salary/fixed", get(list_fixed_salaries).post(create_fixed_salary))
+        .route(
+            "/api/salary/fixed/:id",
+            get(get_fixed_salary)
+                .put(update_fixed_salary)
+                .delete(delete_fixed_salary),
+        )
+        // Variable salary
+        .route("/api/salary/variable", get(list_variable_salaries).post(create_variable_salary))
+        .route(
+            "/api/salary/variable/:id",
+            get(get_variable_salary)
+                .put(update_variable_salary)
+                .delete(delete_variable_salary),
+        )
         .layer(cors)
         .with_state(state);
 

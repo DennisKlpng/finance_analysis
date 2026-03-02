@@ -136,3 +136,39 @@ pub struct MonthSummary {
     pub total_expenses: f64,
     pub net: f64,
 }
+
+// ─── Wealth Tracking ──────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WealthSnapshot {
+    pub id: Option<i64>,
+    pub date: NaiveDate,
+    pub components: Vec<WealthComponent>,
+    pub total: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WealthComponent {
+    pub id: Option<i64>,
+    pub snapshot_id: Option<i64>,
+    pub name: String,
+    pub amount: f64,
+}
+
+// ─── Salary Tracking ──────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FixedSalary {
+    pub id: Option<i64>,
+    pub effective_date: NaiveDate,
+    pub monthly_amount: f64,
+    pub payments_per_year: u32, // 12, 13, 14, etc.
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VariableSalary {
+    pub id: Option<i64>,
+    pub date: NaiveDate,
+    pub amount: f64,
+    pub description: String,
+}

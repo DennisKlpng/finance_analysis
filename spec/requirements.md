@@ -55,6 +55,50 @@ All entries must be categorized by two dimensions:
 - Necessity Category
 - Is Income (bool)
 
+#### 2.4 Wealth Tracking
+
+**Wealth Snapshot**:
+- ID (optional, auto-generated)
+- Date (NaiveDate)
+- Components (list of WealthComponent)
+- Total (f64, calculated sum)
+
+**Wealth Component**:
+- ID (optional, auto-generated)
+- Snapshot ID (foreign key)
+- Name (String, flexible user-defined)
+- Amount (f64)
+
+**Purpose**: Track total wealth at different points in time with flexible breakdown into user-defined components (e.g., bank accounts, investments, cash, debts).
+
+**Constraints**:
+- Each snapshot must have a unique date
+- Components are flexible - users can define any categories they need
+- Total is automatically calculated from component sum
+- Negative amounts supported for liabilities/debts
+
+#### 2.5 Salary Tracking
+
+**Fixed Salary**:
+- ID (optional, auto-generated)
+- Effective Date (NaiveDate)
+- Monthly Amount (f64)
+- Payments Per Year (u32, e.g., 12, 13, 14)
+
+**Variable Salary**:
+- ID (optional, auto-generated)
+- Date (NaiveDate)
+- Amount (f64)
+- Description (String)
+
+**Purpose**: Track salary development over time, including base salary changes and one-time variable compensation (bonuses, commissions).
+
+**Constraints**:
+- Fixed salary represents the base monthly salary effective from a given date
+- Payments per year accounts for additional monthly payments (13th/14th salary)
+- Variable salary entries are one-time payments
+- Annual salary = Monthly Amount × Payments Per Year
+
 ### 3. Database Requirements
 
 #### 3.1 Initialization
@@ -70,7 +114,51 @@ All entries must be categorized by two dimensions:
 
 ### 4. User Interface Requirements
 
-#### 4.1 Year Overview (Front Page)
+#### 4.1 Wealth Overview (Front Page)
+- **Primary Tab**: First tab in navigation
+- Display wealth development over time with line chart
+- Show yearly balance changes table
+- Manage wealth snapshots with flexible components
+- Track salary history and development
+
+**Wealth Development Chart**:
+- Line chart showing total wealth over time
+- X-axis: Dates from snapshots
+- Y-axis: Wealth amount in €
+- Automatic update when snapshots added/removed
+
+**Yearly Balance Table**:
+- Columns: Year | Starting Wealth | Ending Wealth | Change | % Change
+- Starting Wealth = First snapshot of year
+- Ending Wealth = First snapshot of next year (or last of current year)
+- Color-coded positive (green) / negative (red) changes
+
+**Wealth Snapshot Management**:
+- List of all snapshots (expandable to show components)
+- Add new snapshot with dynamic component fields
+- Delete existing snapshots
+- Error handling for duplicate dates
+- Real-time total calculation
+
+**Salary Management**:
+- **Fixed Salary Section**:
+  - Table showing all salary changes chronologically
+  - Columns: Effective Date | Monthly Salary | Payments/Year | Annual Salary
+  - Add/delete salary entries
+
+- **Variable Salary Section**:
+  - Table showing one-time salary payments
+  - Columns: Date | Amount | Description
+  - Add/delete entries
+
+- **Salary Development Analysis**:
+  - January 1st snapshot table showing:
+    - Effective annual salary on Jan 1 of each year
+    - Change vs previous year (€ and %)
+    - Cumulative % change vs first entry
+  - Color-coded changes
+
+#### 4.2 Finance Overview (Year Overview)
 - Display current year by default
 - Year navigation controls (◀ Previous | Next ▶)
 - Monthly breakdown table showing:
@@ -193,7 +281,49 @@ All entries must be categorized by two dimensions:
 - All assets embedded in binary
 - Minimal dependencies
 
-### 8. Out of Scope
+### 8. API Endpoints
+
+#### 8.1 Wealth Snapshots
+- `GET /api/wealth` - List all wealth snapshots with components
+- `POST /api/wealth` - Create new wealth snapshot
+- `GET /api/wealth/:date` - Get specific snapshot by date
+- `PUT /api/wealth/:date` - Update existing snapshot
+- `DELETE /api/wealth/:date` - Delete snapshot
+
+**Validation**:
+- Date must be unique (no duplicates)
+- Must have at least one component
+- Components must have non-empty names
+- Total automatically calculated
+
+#### 8.2 Fixed Salary
+- `GET /api/salary/fixed` - List all fixed salary entries
+- `POST /api/salary/fixed` - Create new fixed salary entry
+- `GET /api/salary/fixed/:id` - Get specific entry by ID
+- `PUT /api/salary/fixed/:id` - Update existing entry
+- `DELETE /api/salary/fixed/:id` - Delete entry
+
+**Validation**:
+- Monthly amount must be positive
+- Payments per year must be between 1 and 24
+- Effective date required
+
+#### 8.3 Variable Salary
+- `GET /api/salary/variable` - List all variable salary entries
+- `POST /api/salary/variable` - Create new variable salary entry
+- `GET /api/salary/variable/:id` - Get specific entry by ID
+- `PUT /api/salary/variable/:id` - Update existing entry
+- `DELETE /api/salary/variable/:id` - Delete entry
+
+**Validation**:
+- Amount can be positive or negative
+- Description required
+- Date required
+
+#### 8.4 Existing Endpoints
+All previous endpoints for singular entries, regular entries, monthly summaries, yearly summaries, and Excel import remain unchanged.
+
+### 9. Out of Scope
 - Multi-user support
 - Remote access / cloud sync
 - Mobile applications
