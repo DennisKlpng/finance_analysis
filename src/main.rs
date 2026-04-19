@@ -3,7 +3,7 @@ mod routes;
 use std::sync::{Arc, Mutex};
 
 use axum::{
-    routing::{delete, get, post, put},
+    routing::{get, post},
     Router,
 };
 use tower_http::cors::{Any, CorsLayer};
