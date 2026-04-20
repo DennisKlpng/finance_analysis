@@ -318,6 +318,14 @@ pub async fn import_excel(
 
 // ─── Wealth Snapshots ─────────────────────────────────────────────────────────
 
+pub async fn list_wealth_categories() -> Response {
+    let cats: Vec<serde_json::Value> = finance_analysis::models::WealthComponentCategory::all()
+        .iter()
+        .map(|c| serde_json::json!({ "code": c.code(), "name": c.as_str() }))
+        .collect();
+    Json(cats).into_response()
+}
+
 pub async fn list_wealth_snapshots(State(db): State<AppState>) -> Response {
     let db = db.lock().unwrap();
     match db.get_all_wealth_snapshots() {

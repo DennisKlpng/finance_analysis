@@ -139,6 +139,70 @@ pub struct MonthSummary {
 
 // ─── Wealth Tracking ──────────────────────────────────────────────────────────
 
+/// Standardized wealth component categories. Change names here to rename across the app.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "lowercase")]
+pub enum WealthComponentCategory {
+    W1,
+    W2,
+    W3,
+    W4,
+    W5,
+    W6,
+    W7,
+}
+
+impl WealthComponentCategory {
+    pub fn as_str(&self) -> &str {
+        match self {
+            WealthComponentCategory::W1 => "Girokonto",
+            WealthComponentCategory::W2 => "Sparkonto",
+            WealthComponentCategory::W3 => "Depot",
+            WealthComponentCategory::W4 => "Bargeld",
+            WealthComponentCategory::W5 => "Immobilien",
+            WealthComponentCategory::W6 => "Schulden",
+            WealthComponentCategory::W7 => "Sonstiges",
+        }
+    }
+
+    pub fn from_str(s: &str) -> Option<Self> {
+        match s {
+            "Girokonto" => Some(WealthComponentCategory::W1),
+            "Sparkonto" => Some(WealthComponentCategory::W2),
+            "Depot" => Some(WealthComponentCategory::W3),
+            "Bargeld" => Some(WealthComponentCategory::W4),
+            "Immobilien" => Some(WealthComponentCategory::W5),
+            "Schulden" => Some(WealthComponentCategory::W6),
+            "Sonstiges" => Some(WealthComponentCategory::W7),
+            _ => None,
+        }
+    }
+
+    pub fn code(&self) -> &str {
+        match self {
+            WealthComponentCategory::W1 => "w1",
+            WealthComponentCategory::W2 => "w2",
+            WealthComponentCategory::W3 => "w3",
+            WealthComponentCategory::W4 => "w4",
+            WealthComponentCategory::W5 => "w5",
+            WealthComponentCategory::W6 => "w6",
+            WealthComponentCategory::W7 => "w7",
+        }
+    }
+
+    pub fn all() -> &'static [WealthComponentCategory] {
+        &[
+            WealthComponentCategory::W1,
+            WealthComponentCategory::W2,
+            WealthComponentCategory::W3,
+            WealthComponentCategory::W4,
+            WealthComponentCategory::W5,
+            WealthComponentCategory::W6,
+            WealthComponentCategory::W7,
+        ]
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WealthSnapshot {
     pub id: Option<i64>,
@@ -151,7 +215,7 @@ pub struct WealthSnapshot {
 pub struct WealthComponent {
     pub id: Option<i64>,
     pub snapshot_id: Option<i64>,
-    pub name: String,
+    pub category: WealthComponentCategory,
     pub amount: f64,
 }
 

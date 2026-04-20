@@ -55,6 +55,7 @@ async fn main() -> anyhow::Result<()> {
         // Excel import
         .route("/api/import/excel", post(import_excel))
         // Wealth snapshots
+        .route("/api/wealth/categories", get(list_wealth_categories))
         .route("/api/wealth", get(list_wealth_snapshots).post(create_wealth_snapshot))
         .route(
             "/api/wealth/:date",

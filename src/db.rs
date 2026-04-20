@@ -53,7 +53,7 @@ impl Database {
             CREATE TABLE IF NOT EXISTS wealth_components (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 snapshot_id INTEGER NOT NULL,
-                name TEXT NOT NULL,
+                category TEXT NOT NULL,
                 amount REAL NOT NULL,
                 FOREIGN KEY (snapshot_id) REFERENCES wealth_snapshots(id) ON DELETE CASCADE
             );
@@ -389,8 +389,8 @@ impl Database {
         // Insert components
         for component in &snapshot.components {
             self.conn.execute(
-                "INSERT INTO wealth_components (snapshot_id, name, amount) VALUES (?1, ?2, ?3)",
-                params![snapshot_id, component.name, component.amount],
+                "INSERT INTO wealth_components (snapshot_id, category, amount) VALUES (?1, ?2, ?3)",
+                params![snapshot_id, component.category.as_str(), component.amount],
             )?;
         }
 
@@ -445,18 +445,26 @@ impl Database {
 
     fn get_wealth_components(&self, snapshot_id: i64) -> Result<Vec<WealthComponent>> {
         let mut stmt = self.conn.prepare(
-            "SELECT id, name, amount FROM wealth_components WHERE snapshot_id = ?1"
+            "SELECT id, category, amount FROM wealth_components WHERE snapshot_id = ?1"
         )?;
         let rows = stmt.query_map(params![snapshot_id], |row| {
-            Ok(WealthComponent {
-                id: Some(row.get(0)?),
-                snapshot_id: Some(snapshot_id),
-                name: row.get(1)?,
-                amount: row.get(2)?,
-            })
+            let cat_str: String = row.get(1)?;
+            Ok((row.get::<_, i64>(0)?, cat_str, row.get::<_, f64>(2)?))
         })?;
 
-        rows.collect()
+        let mut components = Vec::new();
+        for row in rows {
+            let (id, cat_str, amount) = row?;
+            let category = WealthComponentCategory::from_str(&cat_str)
+                .expect("Invalid wealth component category in DB");
+            components.push(WealthComponent {
+                id: Some(id),
+                snapshot_id: Some(snapshot_id),
+                category,
+                amount,
+            });
+        }
+        Ok(components)
     }
 
     pub fn update_wealth_snapshot(&self, snapshot: &WealthSnapshot) -> Result<()> {
@@ -471,8 +479,8 @@ impl Database {
         // Insert new components
         for component in &snapshot.components {
             self.conn.execute(
-                "INSERT INTO wealth_components (snapshot_id, name, amount) VALUES (?1, ?2, ?3)",
-                params![id, component.name, component.amount],
+                "INSERT INTO wealth_components (snapshot_id, category, amount) VALUES (?1, ?2, ?3)",
+                params![id, component.category.as_str(), component.amount],
             )?;
         }
 
